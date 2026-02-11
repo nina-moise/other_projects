@@ -11,10 +11,9 @@
 + **SQL**
 + **PostgreSQL**
 + **DBeaver**
-
   
 ## Результаты 
- Решение оформлено в тетрадке Jupyter Notebook.
+**[Решение](https://github.com/nina-moise/other_projects/blob/main/ELN/Script%20ELN.sql)**
 
 
 
