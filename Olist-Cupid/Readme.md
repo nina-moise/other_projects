@@ -1,6 +1,6 @@
 # Снижение дисперсии в A/B тестах с помощью метода CUPED (на данных маркетплейса Olist)
 
-[HTML]() [ipynb]()
+[HTML](https://github.com/nina-moise/other_projects/blob/main/Olist-Cupid/Olist_CUPED.html) [ipynb](https://github.com/nina-moise/other_projects/blob/main/Olist-Cupid/Olist_CUPED.ipynb)
 
 ## Цель проекта 
 Оценить эффективность маркетинговой кампании в условиях высокой дисперсии целевой метрики на данных выручки городов маркетплейса Olist.
