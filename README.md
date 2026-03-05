@@ -5,6 +5,7 @@
 |  # |     Наименование проекта        |          Описание             |       Стек            |
 |----|---------------------------------| ------------------------------|-----------------------|
 | 1. | [Отчет по выданным ЭЛН](https://github.com/nina-moise/other_projects/tree/main/ELN)  |Решение ad hoc задачи - формирование отчета нужного шаблона, не предусмотренного стандартными средствами программы |SQL,PostgreSQL, DBeaver| 
-| 2. | [AIS](https://github.com/nina-moise/other_projects/edit/main/AIS) |Исследование влияния пола и вида спорта на показатели крови и безжировую массу тела спортсменов. Построение моделей машинного обучения для предсказания веса спортсмена на основе его роста|Python, Pandas, Matplotlib, Seaborn, Numpy, Phik, Sklearn, EDA, ML, Jupyter Notebook| 
+| 2. | [Olist-Cupid]()  |Снижение дисперсии в A/B тестах с помощью метода CUPED (на данных маркетплейса Olist) |Python, Pandas, Matplotlib, Matplotlib_venn, Seaborn, Numpy, Scipy| 
+| 3. | [AIS](https://github.com/nina-moise/other_projects/edit/main/AIS) |Исследование влияния пола и вида спорта на показатели крови и безжировую массу тела спортсменов. Построение моделей машинного обучения для предсказания веса спортсмена на основе его роста|Python, Pandas, Matplotlib, Seaborn, Numpy, Phik, Sklearn, EDA, ML, Jupyter Notebook| 
 
 
