@@ -22,6 +22,7 @@
 + **Json**
 + **Numpy**
 + **Jupyter Notebook**
++ **Yandex DataLens**
 
  ## Этапы проекта
  
