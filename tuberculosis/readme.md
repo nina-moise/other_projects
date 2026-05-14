@@ -80,8 +80,12 @@
 
 **Результат:**  средствами Python создан скрипт для расчета показателей.
 
+[Jupyter Notebooks](https://github.com/nina-moise/other_projects/blob/main/tuberculosis/calc_indicators.ipynb) [HTML](https://github.com/nina-moise/other_projects/blob/main/tuberculosis/calc_indicators.html)
+
 
 [Архив со сводной таблицей с абсолютными значениями 2016-2024 для работы скрипта](https://github.com/nina-moise/other_projects/blob/main/tuberculosis/calc_indicators.zip)
+
+[Итоговый файл с показателями]()
 
 ## Этап 3. Разработка дашбордов
 3.1. Проектирование визуализаций (в соответствии с требованиями заказчика)
