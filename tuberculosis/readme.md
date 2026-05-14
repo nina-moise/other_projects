@@ -50,11 +50,11 @@
 
 **Результат:**  средствами Python создан файл **indicators.jsonl** для расчета относительных показателей по туберкулезу.
 
-[Jupyter Notebooks]()
+[Jupyter Notebooks](https://github.com/nina-moise/other_projects/blob/main/tuberculosis/make_formula_file.ipynb) [HTML](https://github.com/nina-moise/other_projects/blob/main/tuberculosis/make_formula_file.html)
 
-[indicators.jsonl]()
+[indicators.jsonl](https://github.com/nina-moise/other_projects/blob/main/tuberculosis/indicators.jsonl)
 
-**Главное преимущество** такой структуры — её масштабируемость, можно использовать эту структуру для расчета других аналогичных показателей по другим статистическим медицинским формам.
+**Главное преимущество** такой структуры файла — её масштабируемость, в дальнейшем можно использовать эту структуру для расчета других аналогичных показателей по другим статистическим медицинским формам.
 
 **2.1. Расчёт производных показателей**
 
