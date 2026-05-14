@@ -14,7 +14,7 @@
 4. Подготовка итогового отчёта и передача результатов заказчику.
 
 ## Техническое задание
-[pdf]()
+[pdf](https://github.com/nina-moise/other_projects/blob/main/tuberculosis/TZ_tuberculosis.pdf)
 
 ## Навыки и инструменты
 + **Python**
