@@ -9,4 +9,3 @@ numpy
 sqlalchemy
 dotenv
 pathlib
-os
