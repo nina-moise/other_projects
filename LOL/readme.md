@@ -8,7 +8,7 @@
 Разработать интерактивный дашборд, отображающий статистику матчей, игроков и чемпионов League of Legends за текущий месяц для регионов Европа и США. Дашборд должен быть реализован на Python с использованием официального API Riot Games.
 
 ## Задачи проекта
-1. Extract - извлечение данных с использованием официального APIRiot Games. 
+1. Extract. Извлечение данных с использованием официального APIRiot Games. 
 2. Transform обработка извлеченных данных
 3. Load Разработка интерактивных дашбордов в DataLens для визуализации результатов.
 4. Dashboard Подготовка итогового отчёта и передача результатов заказчику.
@@ -38,11 +38,14 @@
  
  **Результат:** 
  
-- скрипт для сбора данных [zip](https://github.com/nina-moise/other_projects/blob/main/tuberculosis/2100_2019-2021_%D0%B4%D0%BB%D0%B8%D0%BD%D0%BD%D1%8B%D0%B9.zip) средствами Python получена сводная таблица 2100 за 2019-2021 годы в "длинном" формате.
+- Скрипт для сбора данных [Jupyter Notebooks]() [HTML]()
 
-Данные: данные собирались 14.06.2026-15.06.2026 за период: май 2026. 
+- Пример файла с настройками
 
-[Jupyter Notebooks](https://github.com/nina-moise/other_projects/blob/main/tuberculosis/transform_table_2100.ipynb) [HTML](https://github.com/nina-moise/other_projects/blob/main/tuberculosis/transform_table_2100.html)
+- Данные: архив *.csv и *.log: [7z](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_data_05_2026.7z)
+
+- Данные за май 2026: собирались в период 14.06.2026-15.06.2026. 
+
 
    
 ### Этап 2. Анализ (Python)
