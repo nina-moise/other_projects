@@ -23,7 +23,7 @@
 
  ## Этапы проекта
  
- ### Этап 1. Extract - Извлечение данных с использованием официального API Riot Games 
+ ## Этап 1. Extract - Извлечение данных с использованием официального API Riot Games 
  1. Регистрация на	портале	разработчиков	[Riot Games](https://www.riotgames.com)
  2. Получение личного [Development	API	Key](https://developer.riotgames.com/)
  3. Изучение [документации эндпоинтов](https://developer.riotgames.com/apis)
@@ -40,7 +40,7 @@
 - Данные: архив *.csv и *.log: [7z](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_data_05_2026.7z)
 - Данные за май 2026: собирались в период 14.06.2026-15.06.2026. 
 
-### Этап 2. Transform & Load
+## Этап 2. Transform & Load
 
 Выполнен Этап T (Transform) в архитектуре ETL проекта:
 
