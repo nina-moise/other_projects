@@ -1,7 +1,6 @@
 pandas
 streamlit
-plotly.express
-plotly.graph_objects
+plotly
 numpy
 sqlalchemy
 dotenv
