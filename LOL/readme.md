@@ -38,7 +38,7 @@
  
  **Результат:** 
  
-- Скрипт для сбора данных [Jupyter Notebooks]() [HTML]()
+- Скрипт для сбора данных [Jupyter Notebooks](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_extract.ipynb) [HTML](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_extract.html)
 
 - Пример файла с настройками [lol.env](https://github.com/nina-moise/other_projects/blob/main/LOL/lol.env)
 
