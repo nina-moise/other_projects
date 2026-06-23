@@ -40,7 +40,7 @@
  
 - Скрипт для сбора данных [Jupyter Notebooks]() [HTML]()
 
-- Пример файла с настройками [lol.env]()
+- Пример файла с настройками [lol.env](https://github.com/nina-moise/other_projects/blob/main/LOL/lol.env)
 
 - Данные: архив *.csv и *.log: [7z](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_data_05_2026.7z)
 
