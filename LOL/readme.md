@@ -21,14 +21,10 @@
  ## Этапы проекта
  
  ### Этап 1. Extract - Извлечение данных с использованием официального API Riot Games 
-
- 1.1. Регистрация на	портале	разработчиков	[Riot Games](https://www.riotgames.com)
- 
- 1.2. Получение личного [Development	API	Key](https://developer.riotgames.com/)
- 
- 1.3. Изучение [документации эндпоинтов](https://developer.riotgames.com/apis)
- 
- 1.2. Получение и сохранение данных с помощью личного API	Key за **май 2026** по следующей схеме:
+ 1. Регистрация на	портале	разработчиков	[Riot Games](https://www.riotgames.com)
+ 2. Получение личного [Development	API	Key](https://developer.riotgames.com/)
+ 3. Изучение [документации эндпоинтов](https://developer.riotgames.com/apis)
+ 4. Получение и сохранение данных с помощью личного API	Key за **май 2026** по следующей схеме:
 
 - запрос списка активных игроков через эндпоинт `/lol/league/v4/`
 - получение истории матчей (`matchIds`) для каждого игрока через `/lol/match/v5/`
@@ -37,11 +33,8 @@
  **Результат:** 
  
 - Скрипт для сбора данных [Jupyter Notebooks](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_extract.ipynb) [HTML](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_extract.html)
-
 - Пример файла с настройками [lol.env](https://github.com/nina-moise/other_projects/blob/main/LOL/lol.env)
-
 - Данные: архив *.csv и *.log: [7z](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_data_05_2026.7z)
-
 - Данные за май 2026: собирались в период 14.06.2026-15.06.2026. 
 
 ### Этап 2. Transform & Load
@@ -50,7 +43,7 @@
 
 1. **Предобработка данных (Python / Pandas)**: Полученные на этапе извлечения «сырые» данные в формате CSV очищены от дубликатов, в них обработаны пропуски, осуществлено приведение типов к нужным форматам. Финальные очищенные данные сохранены в промежуточные датафреймы.
 
-Выполнена 1-я часть этапа L (Load) в архитектуре ETL проекта - загрузка в хранилище.
+Выполнена этап L (Load) в архитектуре ETL проекта - загрузка в хранилище.
    
 2. **Миграция в СУБД**: Очищенные структурированные данные перенесены в реляционные таблицы облачной базы данных Supabase (PostgreSQL) (ресурс https://supabase.com) для долгосрочного структурированного хранения.
 3. **Агрегация и расчет KPI (SQL Views)**: С помощью SQL-скриптов на стороне базы данных сформированы витрины данных (представления). В них заранее рассчитаны сложные игровые метрики (KDA, индекс агрессии игроков, винрейты сторон по регионам), что позволяет минимизировать нагрузку на дашборд и обеспечить мгновенную загрузку интерфейса.
@@ -58,4 +51,16 @@
 **Результат:** 
  
 - Скрипт для обработки и загрузки данных [Jupyter Notebooks](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_T-L.ipynb) [HTML](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_T-L.html)
-- SQL-скрипт с запросами для предпроверки формирования витрин данных [sql](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_SQL_Script.sql) 
+- SQL-скрипт с запросами для предпроверки формирования витрин данных [sql](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_SQL_Script.sql)
+
+
+## Этап 3. Разработка интерфейса (Frontend / BI)
+1. **Развертывание Streamlit**: Спроектировано многостраничное веб-приложение (вкладки «Матчи», «Игроки», «Чемпионы»). [app.py](https://github.com/nina-moise/other_projects/blob/main/LOL/app.py)
+2. **Интерактивная визуализация**: С помощью библиотеки **Plotly** построены динамические графики: линейные тренды активности, круговая диаграмма баланса сторон, пузырьковая диаграмма корреляции параметров.
+3. **Кастомизация UI**: Интерфейс стилизован под фирменный темно-фиолетовый неоновый стиль вселенной League of Legends (Hextech UI).
+
+## Деплой и Кэширование (Deployment)
+1. **Конфигурация зависимостей**: Сформирован файл [`requirements.txt`](https://github.com/nina-moise/other_projects/blob/main/LOL/requirements.txt) для управления библиотеками в изолированном контейнере.
+2. **Оптимизация скорости**: Настроено серверное кэширование данных (`@st.cache_resource` и `@st.cache_data`) для мгновенного переключения фильтров по регионам и лигам без повторных тяжелых запросов к базе.
+3. **Публикация**: Проект успешно развернут на облачной платформе **Streamlit Cloud** с безопасным подключением к БД через механизм `Streamlit Secrets`: [ссылка на дашборд](https://otherprojects-vatxkrbkzdjbxjdvpmwbaq.streamlit.app/)
+
