@@ -14,15 +14,13 @@
 4. Dashboard Подготовка итогового отчёта и передача результатов заказчику.
 
 ## Техническое задание
-[pdf](https://github.com/nina-moise/other_projects/blob/main/tuberculosis/TZ_tuberculosis.pdf)
+[pdf]()
 
-## Навыки и инструменты
-+ **Python**
-+ **Pandas**
-+ **Json**
-+ **Numpy**
-+ **Jupyter Notebook**
-+ ****
+## Использованные технологии и навыки
+* **Data Sourcing**: Интеграция с официальным **Riot Games API** (отправка запросов, обработка JSON, обход лимитов).
+* **Backend & DB**: Python (Pandas, Requests, Gc, Logging), Supabase (PostgreSQL), SQLAlchemy.
+* **Frontend**: Streamlit, Plotly.
+* **Jupyter Notebook**, **DBeaver**
 
  ## Этапы проекта
  
@@ -34,8 +32,12 @@
  
  1.3. Изучение [документации эндпоинтов](https://developer.riotgames.com/apis)
  
- 1.2. Получение и сохранение данных с помощью личного API	Key за период: **май 2026.**
- 
+ 1.2. Получение и сохранение данных с помощью личного API	Key за **май 2026** по следующей схеме:
+
+- запрос списка активных игроков через эндпоинт `/lol/league/v4/`
+- получение истории матчей (`matchIds`) для каждого игрока через `/lol/match/v5/`
+- выгрузка детальной статистики каждого матча (тайминги, KDA, золото)
+
  **Результат:** 
  
 - Скрипт для сбора данных [Jupyter Notebooks](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_extract.ipynb) [HTML](https://github.com/nina-moise/other_projects/blob/main/LOL/LOL_extract.html)
