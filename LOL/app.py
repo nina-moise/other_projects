@@ -1,7 +1,6 @@
 # League of Legends. Этап 4 - Построение дашборда.
 #Задача: на основе подготовленных QL-представлений (Views) в БД Supabase создать дашборд по игре League of Games.
 
-
 import pandas as pd
 import streamlit as st
 import plotly.express as px
@@ -14,8 +13,9 @@ from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 from pathlib import Path
 import os
+
 # ======== Блок функций - НАЧАЛО ===================================
-@st.cache_data
+#@st.cache_data
 @st.cache_resource
 
 def get_connection(db_url):
@@ -60,6 +60,8 @@ def load_boxplot_data(region_name):
         df_view = run_query(sql_query, params=(region_name,))
     return pd.DataFrame(df_view)
 
+# Декоратор для кеша
+@st.cache_data(ttl=600)
 def load_side_winrate(region_name):
     """
     Получение соотношения побед синей и красной сторон
@@ -81,6 +83,7 @@ def load_side_winrate(region_name):
         
     return pd.DataFrame(df_view)
 
+@st.cache_data(ttl=600)
 def load_kpm_by_version(region_name):
     """Получение индекса кровавости по патчам"""
     # SQL-запрос к витрине v_kpm_by_version
@@ -91,6 +94,7 @@ def load_kpm_by_version(region_name):
     df_view = run_query(sql_query, params=(region_name,))
     return pd.DataFrame(df_view)
 
+@st.cache_data(ttl=600)
 def load_lp_distribution_with_tier(region_name, league_name):
     """Загрузка данных распределения LP игроков с фильтрацией по региону и лиге"""
     # В витрине присутствует агрегат "Все регионы", поэтому только 2 сценария
@@ -119,6 +123,7 @@ def load_lp_distribution_with_tier(region_name, league_name):
         
     return pd.DataFrame(df_view)
 
+@st.cache_data(ttl=600)
 def load_league_kpi(region_name, league_name):
     """Загрузка 4 ключевых индикаторов лиги из v_kpi_league"""
     
@@ -148,6 +153,7 @@ def load_league_kpi(region_name, league_name):
     
     return pd.DataFrame(df_view)
 
+@st.cache_data(ttl=600)
 def load_league_kda(region_name, league_name):
     """ИГРОКИ Ярус 2 : Получение среднего KDA игроков для выбранного среза"""
     
@@ -174,6 +180,7 @@ def load_league_kda(region_name, league_name):
                 
     return val_kda
 
+@st.cache_data(ttl=600)
 def load_league_ka(region_name, league_name):
     """ИГРОКИ Ярус 2 : Получение среднего KA (индекс агрессии) игроков для выбранного среза"""
     
@@ -200,6 +207,7 @@ def load_league_ka(region_name, league_name):
                 
     return val_ka
 
+@st.cache_data(ttl=600)
 def find_player_kpi(player_name, league_name):    
     """
     Функция возвращает список игроков и  его характеристики
@@ -266,6 +274,7 @@ def find_player_kpi(player_name, league_name):
         df_view = run_query(query, params=(search_pattern, league_name))
         return df_view  
 
+@st.cache_data(ttl=600)
 def find_top_lp(region_name, league_name):    
     """
     Функция возвращает ТОП-10 по LP игроков в зависимости от региона и лиги 
@@ -315,6 +324,7 @@ def find_top_lp(region_name, league_name):
 
     return df_view  
 
+@st.cache_data(ttl=600)
 def find_top_games_count(region_name, league_name):    
     """
     Функция возвращает ТОП-10 игроков по Количеству игр в зависимости от региона и лиги 
@@ -364,6 +374,7 @@ def find_top_games_count(region_name, league_name):
 
     return df_view  
 
+@st.cache_data(ttl=600)
 def find_top_winrate(region_name, league_name):    
     """
     Функция возвращает ТОП-10 игроков по Количеству игр в зависимости от региона и лиги 
@@ -413,6 +424,7 @@ def find_top_winrate(region_name, league_name):
 
     return df_view  
 
+@st.cache_data(ttl=600)
 def find_player_favorites(player_puuid):
     """ 
     Функция возвращает предпочтения игрока с player_puuid в сезоне  
@@ -675,18 +687,16 @@ st.markdown("""
 
     </style>
 """, unsafe_allow_html=True)
-
-
-
+#==СТИЛИ - КОНЕЦ=========================================================
 
 #==ЗАГОЛОВОК=============================================================
 
 st.title("⚔️ Аналитика League of Legends")
 
 #=========================================================================
-# 3. Подключение к БД и создание engine
+# Подключение к БД и создание engine
 
-base_dir = Path('d:/datasets/LOL/') # базовый путь
+base_dir = Path(__file__).parent # базовый путь
 
 # Загрузка настроек подключения из .env
 env_file = base_dir / "lol.env"
@@ -704,11 +714,10 @@ HOST = os.getenv("host")
 PORT = os.getenv("port")
 DBNAME = os.getenv("dbname")
 
-
 # Создание строки подключения SQLAlchemy 
 DATABASE_URL = f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}?sslmode=require"
 
-engine = get_connection(DATABASE_URL)
+engine = get_connection(DATABASE_URL) 
 
 #=========================================================================
 # Кнопка для ручного сброса кэша базы данных
@@ -724,15 +733,14 @@ st.write(f"Выбранный регион: {selected_region}")
 
 
 # --- БЛОК 2: СОЗДАНИЕ ВКЛАДОК (ЛИСТОВ) ---
-#st.markdown("---") # Визуальный разделитель
 
-# Создаем 3 вкладки с названиями и иконками
-tab2, tab3, tab4 , tab1 = st.tabs(["⚔️Матчи", "🔮Игроки", "🛡️Чемпионы", "⚙️ О дашборде"])
+# Создаем вкладки с названиями и иконками
+tab1, tab2, tab3  = st.tabs(["⚔️Матчи", "🔮Игроки", "🛡️Чемпионы"])
 
 #================================================================================================================    
-# Вкладка 1 --- Матчи ---
+# --- МАТЧИ ---
 
-with tab2:
+with tab1:
     # ----------- Ярус 1 - Индикаторы ---------------------------
     # 1. Загружаем данные для индикаторов для вкладки "Матчи"
     if selected_region == "Все регионы":
@@ -1142,11 +1150,10 @@ with tab2:
             )
             
             st.plotly_chart(fig_kpm_bar, use_container_width=True)
-            
-    
+   
 #================================================================================================================
 # --- ИГРОКИ ---
-with tab3:
+with tab2:
       
     # регион выбирается на сайдбаре
     # Создаем две колонки: под селектор лиги (25%) и пустую зону (75%)
@@ -1569,10 +1576,8 @@ with tab3:
         st.info("Введите никнейм игрока для начала поиска.")
 
 #================================================================================================================
-# --- Чемпионы ---
-with tab4:
-    #st.subheader("Информация об игровых чемпионах")
-    
+# --- ЧЕМПИОНЫ ---
+with tab3:
     # 1. Загружаем данные для индикаторов для вкладки "Чемпионы"
     if selected_region == "Все регионы":
         sql_total = "SELECT total_champions_count AS cnt FROM public.v_total_champions_count;"
@@ -1586,8 +1591,7 @@ with tab4:
 
         sql_total = "SELECT total_avg_gold AS cnt FROM public.v_champions_indicators;"
         avg_gold = run_query(sql_total).iloc[0]['cnt']
-        
-
+   
     else:
         sql_total = "SELECT total_champions_count AS cnt FROM public.v_total_champions_count_region WHERE region = %s;"
         total_champions = run_query(sql_total, params=(selected_region,)).iloc[0]['cnt']
@@ -1601,7 +1605,7 @@ with tab4:
         sql_total = "SELECT total_avg_gold AS cnt FROM public.v_champions_indicators_region WHERE region = %s;"
         avg_gold = run_query(sql_total, params=(selected_region,)).iloc[0]['cnt']
         
-    # 2. Создаем сетку колонок ДЛЯ ИНДИКАТОРОВ строго ВНУТРИ tab1
+    # 2. Создаем сетку колонок ДЛЯ ИНДИКАТОРОВ строго ВНУТРИ tab
     col_kpi1, col_kpi2, col_kpi3 , col_kpi4 =  st.columns(4)
     
     # 3. Выводим индикаторы в рамке
@@ -1633,14 +1637,14 @@ with tab4:
     #st.markdown("<br>", unsafe_allow_html=True)
     
     # -----------Графики в 2-х колонках   
-    # 1. Создаем сетку из 2 колонок одинаковой ширины (пропорция 1:1)
+    # Создаем сетку из 2 колонок одинаковой ширины (пропорция 1:1)
     col_graph1, col_graph2 = st.columns(2)
     
-    # 2. Помещаем ПЕРВЫЙ график (Win Rate) в левую收 колонку
+    # Помещаем график Win Rate в левую收 колонку
     with col_graph1:
         st.markdown("### 🏆 Топ чемпионов по Win Rate")
             
-        # 1. Формируем SQL-запрос к представлению
+        # Формируем SQL-запрос к представлению
         if selected_region == "Все регионы":
             sql_view1 = """
                 SELECT champion_name, winrate 
@@ -1659,9 +1663,9 @@ with tab4:
             """
             df_view1 = run_query(sql_view1, params=(selected_region,))
 
-        # 2. Проверяем, что данные успешно вернулись
+        # Проверяем, что данные успешно вернулись
         if not df_view1.empty:
-            # 3. Строим интерактивную линейчатую диаграмму (Фиолетово-розовый неон)
+            # 3. Строим линейчатую диаграмму 
             fig_winrate = px.bar(
                 df_view1,
                 x="winrate",            
@@ -1674,7 +1678,7 @@ with tab4:
                 color_continuous_scale=["#3b3066", "#7777e9"] 
             )
 
-            # 4. Стилизуем подписи (Белый цвет вместо золотого)
+            # Стилизуем подписи (Белый цвет)
             fig_winrate.update_traces(
                 texttemplate='%{text:.1f}%', 
                 textposition='outside',
@@ -1699,19 +1703,16 @@ with tab4:
                 coloraxis_showscale=False           
             )
 
-            # 5. Выводим график на страницу
+            # Выводим график на страницу
             st.plotly_chart(fig_winrate, use_container_width=True)
-            
             
         else:
             st.warning(f"Данные по Win Rate не найдены для региона {selected_region}")
 
-
-    # 3. Помещаем ВТОРЫЙ график (Pick Rate) в правую колонку
+    # Помещаем график Pick Rate в правую колонку
     with col_graph2:
         st.markdown("### 🔥 Топ чемпионов по Pick Rate")
                 
-        # 1. Формируем SQL-запрос к представлению
         if selected_region == "Все регионы":
             sql_view2 = """
                 SELECT champion_name, pickrate 
@@ -1730,9 +1731,7 @@ with tab4:
             """
             df_view2 = run_query(sql_view2, params=(selected_region,))
 
-        # 2. Проверяем, что данные успешно вернулись
         if not df_view2.empty:
-            # 3. Строим интерактивную линейчатую диаграмму (Фиолетово-розовый неон)
             fig_pickrate = px.bar(
                 df_view2,
                 x="pickrate",            
@@ -1745,7 +1744,6 @@ with tab4:
                 color_continuous_scale=["#3b3066", "#7777e9"] 
             )
 
-            # 4. Стилизуем подписи (Белый цвет вместо золотого)
             fig_pickrate.update_traces(
                 texttemplate='%{text:.1f}%', 
                 textposition='outside',
@@ -1769,21 +1767,20 @@ with tab4:
                 font_color="#ffffff",  
                 coloraxis_showscale=False           
             )
-
-            # 5. Выводим график на страницу
+            
             st.plotly_chart(fig_pickrate, use_container_width=True)
           
         else:
             st.warning(f"Данные по Pick Rate не найдены для региона {selected_region}")
 
-     # Добавим небольшой визуальный отступ между рядами
+    # визуальный отступ между рядами
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ----------- РЯД 2: Графики ниже (тоже в 2 колонки) -----------   
+    # ----------- РЯД 2: Графики ниже (в 2 колонки) -----------   
     # Создаем новую сетку из 2 колонок для нижнего ряда
     col_row2_left, col_row2_right = st.columns(2)
     
-    # 1. Левая колонка нижнего ряда — Scatter Plot
+    # Левая колонка нижнего ряда — Scatter Plot
     with col_row2_left:
         st.markdown("### 🎯 Карта агрессии: Убийства vs Смерти")
         
@@ -1796,7 +1793,7 @@ with tab4:
         df_scatter = run_query(sql_scatter, params=(selected_region,))
 
         if not df_scatter.empty:
-            # Строим интерактивный Scatter Plot
+            # Строим Scatter Plot
             fig_scatter = px.scatter(
                 df_scatter,
                 x="avg_deaths",        
@@ -1839,7 +1836,7 @@ with tab4:
 
     # 2. Правая колонка 
     with col_row2_right:
-            # 2. Правая колонка нижнего ряда — Сложенный Bar Chart по позициям
+            # Правая колонка нижнего ряда — Bar Chart по позициям
         st.markdown("### 🗺️ Распределение чемпионов по позициям")
         
         # SQL-запрос вытаскивает ТОП-15 самых популярных чемпионов выбранного региона
@@ -1892,9 +1889,6 @@ with tab4:
             if show_raw_data_2:
                 # Оборачиваем в контейнер 
                 st.dataframe(df_pos, use_container_width=True)                    
-
-
-
 
         else:
             st.warning(f"Данные по позициям не найдены для региона {selected_region}")
