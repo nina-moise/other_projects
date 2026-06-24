@@ -12644,12 +12644,169 @@ dtype: object</pre>
 </div>
 </div>
 </div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=055e5450-7e04-44f9-ba0a-feb162dbdab8">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [18]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># --- Витрина для пузырьковой диаграммы - зависимость побед от популярности (Win Rate Pick от Rate) для всех игровых чемпионов</span>
+<span class="c1"># -- Для выбранного региона</span>
+<span class="n">create_view_query</span> <span class="o">=</span> <span class="s2">"""</span>
+<span class="s2">CREATE OR REPLACE VIEW public.v_champions_kpi_region AS</span>
+<span class="s2">WITH total_match_count AS (</span>
+<span class="s2">    SELECT	</span>
+<span class="s2">        split_part(match_id, '_', 1) AS region,</span>
+<span class="s2">        COUNT(DISTINCT match_id) AS matches_count</span>
+<span class="s2">    FROM public.lol_matches</span>
+<span class="s2">    GROUP BY split_part(match_id, '_', 1)</span>
+<span class="s2">),</span>
+<span class="s2">champion_stats AS (</span>
+<span class="s2">    SELECT	</span>
+<span class="s2">        split_part(p.match_id, '_', 1) AS region,</span>
+<span class="s2">        p.champion_id,</span>
+<span class="s2">        nc.champion_name,</span>
+<span class="s2">        COUNT(*) AS picks_count,</span>
+<span class="s2">        COUNT(CASE WHEN p.win = true THEN 1 END) AS wins_count</span>
+<span class="s2">    FROM public.lol_players_matches AS p</span>
+<span class="s2">    JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id </span>
+<span class="s2">    GROUP BY split_part(p.match_id, '_', 1), p.champion_id, nc.champion_name</span>
+<span class="s2">),</span>
+<span class="s2">top_champions_metrics AS (</span>
+<span class="s2">    SELECT </span>
+<span class="s2">        c.region,</span>
+<span class="s2">        c.champion_id,</span>
+<span class="s2">        c.champion_name,</span>
+<span class="s2">        c.picks_count,</span>
+<span class="s2">        c.wins_count,</span>
+<span class="s2">        ROUND((c.picks_count::numeric / t.matches_count) * 100, 2) AS pickrate,</span>
+<span class="s2">        ROUND((c.wins_count::numeric / c.picks_count) * 100, 2) AS winrate</span>
+<span class="s2">        FROM champion_stats AS c</span>
+<span class="s2">    JOIN total_match_count AS t ON c.region = t.region</span>
+<span class="s2">)</span>
+<span class="s2">SELECT </span>
+<span class="s2">    region,</span>
+<span class="s2">    champion_id,</span>
+<span class="s2">    champion_name,</span>
+<span class="s2">    picks_count,</span>
+<span class="s2">    wins_count,</span>
+<span class="s2">    pickrate,</span>
+<span class="s2">    winrate</span>
+<span class="s2">FROM top_champions_metrics;</span>
+<span class="s2">"""</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6421746a-1393-44e0-b99e-e2dccb0caaaa">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [19]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">create_supabase_view</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">create_view_query</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>'🎉 Представление успешно создано в Supabase через SQLAlchemy!'</pre>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=0dee419a-b37c-451a-b99c-416052b238f5">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [22]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># --- Витрина для пузырьковой диаграммы - зависимость побед от популярности (Win Rate Pick от Rate) для всех игровых чемпионов</span>
+<span class="c1"># -- Для всех регионов</span>
+<span class="n">create_view_query</span> <span class="o">=</span> <span class="s2">"""</span>
+<span class="s2">CREATE OR REPLACE VIEW public.v_champions_kpi AS</span>
+<span class="s2">with champion_stats AS (</span>
+<span class="s2">    SELECT	</span>
+<span class="s2">        p.champion_id,</span>
+<span class="s2">        nc.champion_name,</span>
+<span class="s2">        COUNT(*) AS picks_count,</span>
+<span class="s2">        COUNT(CASE WHEN p.win = true THEN 1 END) AS wins_count</span>
+<span class="s2">    FROM public.lol_players_matches AS p</span>
+<span class="s2">    JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id </span>
+<span class="s2">    GROUP BY p.champion_id, nc.champion_name</span>
+<span class="s2">),</span>
+<span class="s2">top_champions_metrics AS (</span>
+<span class="s2">    SELECT </span>
+<span class="s2">        'Все регионы' as region,</span>
+<span class="s2">        c.champion_id,</span>
+<span class="s2">        c.champion_name,</span>
+<span class="s2">        c.picks_count,</span>
+<span class="s2">        c.wins_count,</span>
+<span class="s2">        ROUND((c.picks_count::numeric / (SELECT COUNT(DISTINCT match_id) FROM public.lol_matches)) *100, 2)  AS pickrate,</span>
+<span class="s2">        ROUND((c.wins_count::numeric / c.picks_count) * 100, 2) AS winrate</span>
+<span class="s2">        FROM champion_stats AS c</span>
+<span class="s2">    )</span>
+<span class="s2">SELECT </span>
+<span class="s2">    region,</span>
+<span class="s2">    champion_id,</span>
+<span class="s2">    champion_name,</span>
+<span class="s2">    picks_count,</span>
+<span class="s2">    wins_count,</span>
+<span class="s2">    pickrate,</span>
+<span class="s2">    winrate</span>
+<span class="s2">FROM top_champions_metrics;</span>
+<span class="s2">"""</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=77e15817-edec-4ea5-9c5b-b0977d01c843">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [23]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">create_supabase_view</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">create_view_query</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>'🎉 Представление успешно создано в Supabase через SQLAlchemy!'</pre>
+</div>
+</div>
+</div>
+</div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=72ff4376-8130-4fc8-88f0-f84a3f5c7c19">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [99]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [20]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Витрина для scatter-plot зависимостей средних убийств от смертей по чемпионам</span>
@@ -12685,7 +12842,7 @@ dtype: object</pre>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [100]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [21]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">create_supabase_view</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">create_view_query</span><span class="p">)</span>
@@ -12711,7 +12868,7 @@ dtype: object</pre>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [101]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [31]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># -- Витрина для анализа гибкости позиций игровых чемпионов</span>
@@ -12719,23 +12876,25 @@ dtype: object</pre>
 <span class="s2">CREATE OR REPLACE VIEW public.v_champion_positions AS</span>
 <span class="s2">SELECT </span>
 <span class="s2">    split_part(p.match_id, '_', 1) AS region,</span>
+<span class="s2">    p.champion_id,</span>
 <span class="s2">    nc.champion_name,</span>
 <span class="s2">    p.team_position,</span>
 <span class="s2">    COUNT(*) AS games_on_position</span>
 <span class="s2">FROM public.lol_players_matches AS p</span>
 <span class="s2">JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id</span>
 <span class="s2">WHERE p.team_position IS NOT NULL AND p.team_position != ''</span>
-<span class="s2">GROUP BY split_part(p.match_id, '_', 1), nc.champion_name, p.team_position</span>
+<span class="s2">GROUP BY split_part(p.match_id, '_', 1), p.champion_id, nc.champion_name, p.team_position</span>
 <span class="s2">UNION ALL</span>
 <span class="s2">SELECT </span>
 <span class="s2">    'Все регионы' AS region,</span>
+<span class="s2">    p.champion_id,</span>
 <span class="s2">    nc.champion_name,</span>
 <span class="s2">    p.team_position,</span>
 <span class="s2">    COUNT(*) AS games_on_position</span>
 <span class="s2">FROM public.lol_players_matches AS p</span>
 <span class="s2">JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id</span>
 <span class="s2">WHERE p.team_position IS NOT NULL AND p.team_position != ''</span>
-<span class="s2">GROUP BY nc.champion_name, p.team_position;</span>
+<span class="s2">GROUP BY p.champion_id, nc.champion_name, p.team_position;</span>
 <span class="s2">"""</span>
 </pre></div>
 </div>
@@ -12747,7 +12906,168 @@ dtype: object</pre>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [102]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [32]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">create_supabase_view</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">create_view_query</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>'🎉 Представление успешно создано в Supabase через SQLAlchemy!'</pre>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=78e4afc9-4569-4045-8865-5016d4ff1260">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [25]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1">#--- Кривая силы чемпиона от времени игры для выбранного региона</span>
+<span class="c1">#-- Отсекаем редкие матчи, чтобы избежать статистических аномалий (&lt; 5)</span>
+<span class="n">create_view_query</span> <span class="o">=</span> <span class="s2">"""</span>
+<span class="s2">CREATE OR REPLACE VIEW public.v_champion_power_curve_region AS</span>
+<span class="s2">WITH match_intervals AS (</span>
+<span class="s2">    SELECT </span>
+<span class="s2">        split_part(m.match_id, '_', 1) AS region,</span>
+<span class="s2">        p.champion_id,</span>
+<span class="s2">        nc.champion_name,</span>
+<span class="s2">        p.win,</span>
+<span class="s2">        CASE </span>
+<span class="s2">            WHEN m.game_duration / 60 &lt; 20 THEN '1. &lt;20 мин (FF/Сдались)'</span>
+<span class="s2">            WHEN m.game_duration / 60 &gt;= 20 AND m.game_duration / 60 &lt; 25 THEN '2. 20-25 мин (Ранняя)'</span>
+<span class="s2">            WHEN m.game_duration / 60 &gt;= 25 AND m.game_duration / 60 &lt; 30 THEN '3. 25-30 мин (Мид-гейм)'</span>
+<span class="s2">            WHEN m.game_duration / 60 &gt;= 30 AND m.game_duration / 60 &lt; 35 THEN '4. 30-35 мин (Лейт-гейм)'</span>
+<span class="s2">            ELSE '5. 35+ мин (Глубокий лейт)'</span>
+<span class="s2">        END AS game_duration_interval</span>
+<span class="s2">    FROM public.lol_players_matches AS p</span>
+<span class="s2">    JOIN public.lol_matches AS m ON m.match_id = p.match_id</span>
+<span class="s2">    JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id</span>
+<span class="s2">),</span>
+<span class="s2">aggregated_stats AS (</span>
+<span class="s2">    SELECT </span>
+<span class="s2">        region,</span>
+<span class="s2">        champion_id,</span>
+<span class="s2">        champion_name,</span>
+<span class="s2">        game_duration_interval,</span>
+<span class="s2">        COUNT(*) AS total_games,</span>
+<span class="s2">        COUNT(CASE WHEN win = true THEN 1 END) AS wins_count</span>
+<span class="s2">    FROM match_intervals</span>
+<span class="s2">    GROUP BY region, champion_id, champion_name, game_duration_interval</span>
+<span class="s2">)</span>
+<span class="s2">SELECT </span>
+<span class="s2">    region,</span>
+<span class="s2">    champion_id,</span>
+<span class="s2">    champion_name,</span>
+<span class="s2">    game_duration_interval,</span>
+<span class="s2">    total_games,</span>
+<span class="s2">    wins_count,</span>
+<span class="s2">    ROUND((wins_count::numeric / total_games) * 100, 2) AS winrate</span>
+<span class="s2">FROM aggregated_stats</span>
+<span class="s2">WHERE total_games &gt;= 5; </span>
+<span class="s2">"""</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b9af446e-aad1-45ac-8e18-1064f82cf739">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [26]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">create_supabase_view</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">create_view_query</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>'🎉 Представление успешно создано в Supabase через SQLAlchemy!'</pre>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=315e6199-f656-45ad-ba99-fd1a012df782">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [29]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1">#--- Кривая силы чемпиона от времени игры для ВСЕХ регионов</span>
+<span class="c1">#-- Отсекаем редкие матчи, чтобы избежать статистических аномалий - Лимит редких матчей увеличен до 10, так как суммарный объем данных больше</span>
+<span class="n">create_view_query</span> <span class="o">=</span> <span class="s2">"""</span>
+<span class="s2">CREATE OR REPLACE VIEW public.v_champion_power_curve_all AS</span>
+<span class="s2">WITH match_intervals AS (</span>
+<span class="s2">    SELECT </span>
+<span class="s2">        p.champion_id,</span>
+<span class="s2">        nc.champion_name,</span>
+<span class="s2">        p.win,</span>
+<span class="s2">        CASE </span>
+<span class="s2">            WHEN m.game_duration / 60 &lt; 20 THEN '1. &lt;20 мин (FF/Сдались)'</span>
+<span class="s2">            WHEN m.game_duration / 60 &gt;= 20 AND m.game_duration / 60 &lt; 25 THEN '2. 20-25 мин (Ранняя)'</span>
+<span class="s2">            WHEN m.game_duration / 60 &gt;= 25 AND m.game_duration / 60 &lt; 30 THEN '3. 25-30 мин (Мид-гейм)'</span>
+<span class="s2">            WHEN m.game_duration / 60 &gt;= 30 AND m.game_duration / 60 &lt; 35 THEN '4. 30-35 мин (Лейт-гейм)'</span>
+<span class="s2">            ELSE '5. 35+ мин (Глубокий лейт)'</span>
+<span class="s2">        END AS game_duration_interval</span>
+<span class="s2">    FROM public.lol_players_matches AS p</span>
+<span class="s2">    JOIN public.lol_matches AS m ON m.match_id = p.match_id</span>
+<span class="s2">    JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id</span>
+<span class="s2">),</span>
+<span class="s2">aggregated_stats AS (</span>
+<span class="s2">    SELECT </span>
+<span class="s2">        champion_id,</span>
+<span class="s2">        champion_name,</span>
+<span class="s2">        game_duration_interval,</span>
+<span class="s2">        COUNT(*) AS total_games,</span>
+<span class="s2">        COUNT(CASE WHEN win = true THEN 1 END) AS wins_count</span>
+<span class="s2">    FROM match_intervals</span>
+<span class="s2">    GROUP BY champion_id, champion_name, game_duration_interval</span>
+<span class="s2">)</span>
+<span class="s2">SELECT </span>
+<span class="s2">    champion_id,</span>
+<span class="s2">    champion_name,</span>
+<span class="s2">    game_duration_interval,</span>
+<span class="s2">    total_games,</span>
+<span class="s2">    wins_count,</span>
+<span class="s2">    ROUND((wins_count::numeric / total_games) * 100, 2) AS winrate</span>
+<span class="s2">FROM aggregated_stats</span>
+<span class="s2">WHERE total_games &gt;= 10;</span>
+<span class="s2">"""</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4d4f00fe-786b-4b9f-a589-431804a8ac8d">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [30]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">create_supabase_view</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">create_view_query</span><span class="p">)</span>

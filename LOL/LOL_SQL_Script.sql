@@ -123,6 +123,91 @@ filtered_top_champions AS (
 )    
 SELECT * 
 FROM filtered_top_champions;
+
+--- Витрина для пузырьковой диаграммы - зависимость побед от популярности (Win Rate Pick от Rate) для всех игровых чемпионов
+-- для выбранного региона
+WITH total_match_count AS (
+    SELECT	
+        split_part(match_id, '_', 1) AS region,
+        COUNT(DISTINCT match_id) AS matches_count
+    FROM public.lol_matches
+    GROUP BY split_part(match_id, '_', 1)
+),
+champion_stats AS (
+    SELECT	
+        split_part(p.match_id, '_', 1) AS region,
+        p.champion_id,
+        nc.champion_name,
+        COUNT(*) AS picks_count,
+        -- Считаем только те матчи, где игрок победил (win = true )
+        COUNT(CASE WHEN p.win = true THEN 1 END) AS wins_count
+    FROM public.lol_players_matches AS p
+    JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id 
+    GROUP BY split_part(p.match_id, '_', 1), p.champion_id, nc.champion_name
+),
+top_champions_metrics AS (
+    SELECT 
+        c.region,
+        c.champion_id,
+        c.champion_name,
+        c.picks_count,
+        c.wins_count,
+        -- Расчет Pick Rate (отношение к общему числу матчей в регионе)
+        ROUND((c.picks_count::numeric / t.matches_count) * 100, 2) AS pickrate,
+        -- Расчет Win Rate (отношение побед к числу пиков этого конкретного чемпиона)
+        ROUND((c.wins_count::numeric / c.picks_count) * 100, 2) AS winrate
+        --ROW_NUMBER() OVER (PARTITION BY c.region ORDER BY c.picks_count DESC) AS champion_rank
+    FROM champion_stats AS c
+    JOIN total_match_count AS t ON c.region = t.region
+)
+SELECT 
+    region,
+    champion_id,
+    champion_name,
+    picks_count,
+    wins_count,
+    pickrate,
+    winrate
+    --champion_rank
+FROM top_champions_metrics
+
+-- для всех регионов
+with champion_stats AS (
+    SELECT	
+        p.champion_id,
+        nc.champion_name,
+        COUNT(*) AS picks_count,
+        -- Считаем только те матчи, где игрок победил (win = true )
+        COUNT(CASE WHEN p.win = true THEN 1 END) AS wins_count
+    FROM public.lol_players_matches AS p
+    JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id 
+    GROUP BY p.champion_id, nc.champion_name
+),
+top_champions_metrics AS (
+    SELECT 
+        'Все регионы' as region,
+        c.champion_id,
+        c.champion_name,
+        c.picks_count,
+        c.wins_count,
+        -- Расчет Pick Rate (отношение к общему числу матчей в регионе)
+        ROUND((c.picks_count::numeric / (SELECT COUNT(DISTINCT match_id) FROM public.lol_matches)) *100, 2)  AS pickrate,
+        -- Расчет Win Rate (отношение побед к числу пиков этого конкретного чемпиона)
+        ROUND((c.wins_count::numeric / c.picks_count) * 100, 2) AS winrate
+        --ROW_NUMBER() OVER (PARTITION BY c.region ORDER BY c.picks_count DESC) AS champion_rank
+    FROM champion_stats AS c
+    )
+SELECT 
+    region,
+    champion_id,
+    champion_name,
+    picks_count,
+    wins_count,
+    pickrate,
+    winrate
+    --champion_rank
+FROM top_champions_metrics;
+
 	
 -- Витрина для scatter-plot зависимостей средних убийств от смертей по чемпионам
 SELECT 
@@ -149,23 +234,25 @@ GROUP BY nc.champion_name;
 -- Витрина для анализа гибкости позиций игровых чемпионов
 SELECT 
     split_part(p.match_id, '_', 1) AS region,
+    p.champion_id,
     nc.champion_name,
     p.team_position,
     COUNT(*) AS games_on_position
 FROM public.lol_players_matches AS p
 JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id
 WHERE p.team_position IS NOT NULL AND p.team_position != ''
-GROUP BY split_part(p.match_id, '_', 1), nc.champion_name, p.team_position
+GROUP BY split_part(p.match_id, '_', 1), p.champion_id, nc.champion_name, p.team_position
 UNION ALL
 SELECT 
     'Все регионы' AS region,
+    p.champion_id,
     nc.champion_name,
     p.team_position,
     COUNT(*) AS games_on_position
 FROM public.lol_players_matches AS p
 JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id
 WHERE p.team_position IS NOT NULL AND p.team_position != ''
-GROUP BY nc.champion_name, p.team_position;
+GROUP BY p.champion_id, nc.champion_name, p.team_position;
 
 
 --- МАТЧИ
@@ -186,10 +273,6 @@ FROM public.lol_matches;
 SELECT region, SUM(total_matches) 
 FROM public.v_matches_indicators_region 
 GROUP BY region;
-
-
-
-
 
 
 -- Количество матчей в день
@@ -696,3 +779,93 @@ LEFT JOIN fav_champions c ON p.puuid = c.puuid
 LEFT JOIN fav_positions pos ON p.puuid = pos.puuid
 LEFT JOIN fav_teams t ON p.puuid = t.puuid
 inner join public.nsi_champions as nsi on c.favorite_champion = nsi.champion_id;
+
+
+--- Кривая силы чемпиона от времени игры по регионам
+--CREATE OR REPLACE VIEW public.v_champion_power_curve_region AS
+WITH match_intervals AS (
+    SELECT 
+        split_part(m.match_id, '_', 1) AS region,
+        p.champion_id,
+        nc.champion_name,
+        p.win,
+        -- Переводим длительность в минуты (если duration в секундах, делим на 60)
+        -- И распределяем матчи по смысловым интервалам игры
+        CASE 
+            WHEN m.game_duration / 60 < 20 THEN '1. <20 мин (FF/Сдались)'
+            WHEN m.game_duration / 60 >= 20 AND m.game_duration / 60 < 25 THEN '2. 20-25 мин (Ранняя)'
+            WHEN m.game_duration / 60 >= 25 AND m.game_duration / 60 < 30 THEN '3. 25-30 мин (Мид-гейм)'
+            WHEN m.game_duration / 60 >= 30 AND m.game_duration / 60 < 35 THEN '4. 30-35 мин (Лейт-гейм)'
+            ELSE '5. 35+ мин (Глубокий лейт)'
+        END AS game_duration_interval
+    FROM public.lol_players_matches AS p
+    JOIN public.lol_matches AS m ON m.match_id = p.match_id
+    JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id
+),
+aggregated_stats AS (
+    SELECT 
+        region,
+        champion_id,
+        champion_name,
+        game_duration_interval,
+        COUNT(*) AS total_games,
+        COUNT(CASE WHEN win = true THEN 1 END) AS wins_count
+    FROM match_intervals
+    GROUP BY region, champion_id, champion_name, game_duration_interval
+)
+SELECT 
+    region,
+    champion_id,
+    champion_name,
+    game_duration_interval,
+    total_games,
+    wins_count,
+    -- Считаем винрейт для каждого конкретного временного интервала
+    ROUND((wins_count::numeric / total_games) * 100, 2) AS winrate
+FROM aggregated_stats
+-- Отсекаем редкие матчи, чтобы избежать статистических аномалий
+WHERE total_games >= 5; 
+
+--- Кривая силы чемпиона от времени игры по ВСЕМ регионам
+--CREATE OR REPLACE VIEW public.v_champion_power_curve_all AS
+WITH match_intervals AS (
+    SELECT 
+        p.champion_id,
+        nc.champion_name,
+        p.win,
+        -- Переводим длительность в минуты и распределяем по интервалам матча
+        CASE 
+            WHEN m.game_duration / 60 < 20 THEN '1. <20 мин (FF/Сдались)'
+            WHEN m.game_duration / 60 >= 20 AND m.game_duration / 60 < 25 THEN '2. 20-25 мин (Ранняя)'
+            WHEN m.game_duration / 60 >= 25 AND m.game_duration / 60 < 30 THEN '3. 25-30 мин (Мид-гейм)'
+            WHEN m.game_duration / 60 >= 30 AND m.game_duration / 60 < 35 THEN '4. 30-35 мин (Лейт-гейм)'
+            ELSE '5. 35+ мин (Глубокий лейт)'
+        END AS game_duration_interval
+    FROM public.lol_players_matches AS p
+    JOIN public.lol_matches AS m ON m.match_id = p.match_id
+    JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id
+),
+aggregated_stats AS (
+    SELECT 
+        champion_id,
+        champion_name,
+        game_duration_interval,
+        COUNT(*) AS total_games,
+        COUNT(CASE WHEN win = true THEN 1 END) AS wins_count
+    FROM match_intervals
+    GROUP BY champion_id, champion_name, game_duration_interval
+)
+SELECT 
+    champion_id,
+    champion_name,
+    game_duration_interval,
+    total_games,
+    wins_count,
+    -- Глобальный винрейт для каждого временного интервала
+    ROUND((wins_count::numeric / total_games) * 100, 2) AS winrate
+FROM aggregated_stats
+-- Отсекаем редкие исходы для точности графиков
+WHERE total_games >= 10;
+
+
+
