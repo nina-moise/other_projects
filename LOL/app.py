@@ -1295,7 +1295,7 @@ with tab2:
          # --- МИНИ-СПИДОМЕТР: KDA ---
         st.markdown("<h4>🛡️ Средний KDA игрока лиги</h4>", unsafe_allow_html=True)
         
-        st.markdown("<span style='font-size: 11px; color: #a09eb5; display: block; margin-top: -0.2rem;margin-bottom: 0.4rem;'>Эффективность выживания: соотношение убийств/ассистов к смертям</span>", unsafe_allow_html=True)
+        st.markdown("<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: -0.2rem;margin-bottom: 0.4rem;'>Эффективность выживания: соотношение убийств/ассистов к смертям</span>", unsafe_allow_html=True)
 
         # Загружаем значение KDA (selected_region из сайдбара, selected_league уже есть в нижнем регистре)
         kda_value = load_league_kda(selected_region, selected_league)
@@ -1343,7 +1343,7 @@ with tab2:
     
         # МИНИ-СПИДОМЕТР: АГРЕССИЯ (K/A) ---
         st.markdown("<h4>⚔️ Индекс агрессии игроков лиги</h4>", unsafe_allow_html=True)
-        st.markdown("<span style='font-size: 11px; color: #a09eb5; display: block; margin-top: -0.2rem;margin-bottom: 0.4rem;'>Эгоизм против командной игры: отношение убийств к тейкдаунам (K+A)</span>", unsafe_allow_html=True)
+        st.markdown("<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: -0.2rem;margin-bottom: 0.4rem;'>Эгоизм против командной игры: отношение убийств к тейкдаунам (K+A)</span>", unsafe_allow_html=True)
 
         # Загружаем значение индекса агрессии
         ka_value = load_league_ka(selected_region, selected_league)
@@ -1424,6 +1424,14 @@ with tab2:
         df_top = find_top_lp(selected_region, selected_league)
         # Проверяем, что данные успешно вернулись
         if not df_top.empty:
+            min_val = df_top['lp'].min()
+            max_val = df_top['lp'].max()
+        
+            # Рассчитываем безопасные пределы по оси оси X (+15% к максимальному значению)
+            x_max_limit = max_val * 1.15
+            #ось X начнется чуть левее самого маленького столбца
+            x_min_limit = min_val * 0.95  
+
            # Строим линейчатую диаграмму
             fig_top_lp = px.bar(
                 df_top,
@@ -1454,7 +1462,7 @@ with tab2:
                     showgrid=True, 
                     gridcolor="#2d2b54", # Фиолетовая сетка
                     tickfont=dict(color="#a09eb5"),
-                    range=[df_top["lp"].min(), df_top["lp"].max()] 
+                    range=[x_min_limit, x_max_limit]     
                 ),
                 paper_bgcolor="rgba(0,0,0,0)",      
                 plot_bgcolor="rgba(0,0,0,0)",       
@@ -1476,6 +1484,14 @@ with tab2:
         df_top = find_top_winrate(selected_region, selected_league)
         # Проверяем, что данные успешно вернулись
         if not df_top.empty:
+            min_val = df_top['winrate'].min()
+            max_val = df_top['winrate'].max()
+        
+            # Рассчитываем безопасные пределы по оси оси X (+15% к максимальному значению)
+            x_max_limit = max_val * 1.15
+            #ось X начнется чуть левее самого маленького столбца
+            x_min_limit = min_val * 0.95  
+
            # Строим линейчатую диаграмму
             fig_top_winrate = px.bar(
                 df_top,
@@ -1506,7 +1522,7 @@ with tab2:
                     showgrid=True, 
                     gridcolor="#2d2b54", # Фиолетовая сетка
                     tickfont=dict(color="#a09eb5"),
-                    range=[df_top["winrate"].min(), df_top["winrate"].max()] 
+                    range=[x_min_limit, x_max_limit] 
                 ),
                 paper_bgcolor="rgba(0,0,0,0)",      
                 plot_bgcolor="rgba(0,0,0,0)",       
@@ -1524,6 +1540,15 @@ with tab2:
         df_top = find_top_games_count(selected_region, selected_league)
         # Проверяем, что данные успешно вернулись
         if not df_top.empty:
+
+            min_val = df_top['games_count'].min()
+            max_val = df_top['games_count'].max()
+        
+            # Рассчитываем безопасные пределы по оси оси X (+15% к максимальному значению)
+            x_max_limit = max_val * 1.15
+            #ось X начнется чуть левее самого маленького столбца
+            x_min_limit = min_val * 0.95  
+
            # Строим линейчатую диаграмму
             fig_top_games_count = px.bar(
                 df_top,
@@ -1554,7 +1579,7 @@ with tab2:
                     showgrid=True, 
                     gridcolor="#2d2b54", # Фиолетовая сетка
                     tickfont=dict(color="#a09eb5"),
-                    range=[df_top["games_count"].min(), df_top["games_count"].max()] 
+                    range=[x_min_limit, x_max_limit]
                 ),
                 paper_bgcolor="rgba(0,0,0,0)",      
                 plot_bgcolor="rgba(0,0,0,0)",       
