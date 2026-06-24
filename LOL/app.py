@@ -85,18 +85,43 @@ def load_side_winrate(region_name):
 
 @st.cache_data(ttl=600)
 def load_kpm_by_version(region_name):
-    """Получение индекса кровавости по патчам"""
+    """
+    Получение индекса кровавости по патчам
+    """
     # SQL-запрос к витрине v_kpm_by_version
-    
     sql_query = """
         SELECT game_version, kpm FROM public.v_kpm_by_version WHERE region = %s ORDER BY game_version DESC;
         """
     df_view = run_query(sql_query, params=(region_name,))
     return pd.DataFrame(df_view)
 
+@st.cache_data
+def load_bubble_match_win_time(region_name, selected_team):
+    """
+    Функция получения агрегированных данных из представления для пузырьковой диаграммы матчи зависимость победы от времени
+    """
+    if region_name == "Все регионы":
+        sql_query = """
+                    SELECT * 
+                    FROM public.v_corr_wins_duration
+                    WHERE region = 'Все регионы' AND team_id = %s;
+                    """
+        df_view = run_query(sql_query, params=(selected_team,))
+    else:
+        sql_query = """
+                    SELECT * 
+                    FROM public.v_corr_wins_duration_region 
+                    WHERE region = %s AND team_id = %s;
+                    """
+        df_view = run_query(sql_query, params=(region_name, selected_team))
+            
+    return pd.DataFrame(df_view)
+
 @st.cache_data(ttl=600)
 def load_lp_distribution_with_tier(region_name, league_name):
-    """Загрузка данных распределения LP игроков с фильтрацией по региону и лиге"""
+    """
+    Загрузка данных распределения LP игроков с фильтрацией по региону и лиге
+    """
     # В витрине присутствует агрегат "Все регионы", поэтому только 2 сценария
     # Сценарий 1:  Все лиги
     if league_name == "Все лиги":
@@ -125,7 +150,9 @@ def load_lp_distribution_with_tier(region_name, league_name):
 
 @st.cache_data(ttl=600)
 def load_league_kpi(region_name, league_name):
-    """Загрузка 4 ключевых индикаторов лиги из v_kpi_league"""
+    """
+    Загрузка 4 ключевых индикаторов лиги из v_kpi_league
+    """
     
     # Сценарий 1:  Все лиги
     if league_name == "Все лиги":
@@ -155,8 +182,9 @@ def load_league_kpi(region_name, league_name):
 
 @st.cache_data(ttl=600)
 def load_league_kda(region_name, league_name):
-    """ИГРОКИ Ярус 2 : Получение среднего KDA игроков для выбранного среза"""
-    
+    """
+    Получение среднего KDA игроков для выбранного среза
+    """
     val_kda = 0        
     # Сценарий 1:  Все лиги
     if league_name == "Все лиги":
@@ -182,8 +210,9 @@ def load_league_kda(region_name, league_name):
 
 @st.cache_data(ttl=600)
 def load_league_ka(region_name, league_name):
-    """ИГРОКИ Ярус 2 : Получение среднего KA (индекс агрессии) игроков для выбранного среза"""
-    
+    """
+    Получение среднего KA (индекс агрессии) игроков для выбранного среза
+    """
     val_ka = 0        
     # Сценарий 1:  Все лиги
     if league_name == "Все лиги":
@@ -437,6 +466,78 @@ def find_player_favorites(player_puuid):
     df_view = run_query(sql_view, params=(player_puuid,))
     
     return df_view  
+
+@st.cache_data(ttl=600)
+def bubble_champions_winrate_pickrate(region_name):
+    """ 
+    Функция возвращает данные для пузырьковой диаграммы зависимости winrate от pickrate чемпиона  
+    """
+    if region_name == "Все регионы":
+        sql_view = """
+                SELECT *
+                FROM public.v_champions_kpi;
+                """
+        df_view = run_query(sql_view, params=())
+    else:    
+        sql_view = """
+                SELECT *
+                FROM public.v_champions_kpi_region
+                WHERE region = %s ;
+                """
+        df_view = run_query(sql_view, params=(region_name,))
+    return df_view  
+
+@st.cache_data(ttl=600)
+def bubble_champions_kills_deaths(region_name):
+    """ Функция возвращает данные для чемпионов выбранного региона для карты агрессии - пузырьковая диаграмма
+    """
+    sql_view = """
+        SELECT 
+        champion_name,
+        avg_kills,
+        avg_deaths,
+        total_matches
+        FROM public.mv_champion_kill_death_stats
+        WHERE region = %s AND total_matches > 10
+        ORDER BY avg_kills DESC;
+        """
+    df_view = run_query(sql_view, params=(region_name,))
+    return df_view
+
+@st.cache_data(ttl=600)
+def load_champion_power_curve(region_name):
+    """
+    Функция возвращает данные для  выбранного региона для кривой силы чемпиона от времени
+    """
+    if region_name == "Все регионы":
+        sql_view = """
+                   SELECT *
+                   FROM public.v_champion_power_curve_all;
+                   """
+        df_view = run_query(sql_view, params=())    
+    else:
+        sql_view = """
+                   SELECT * 
+                   FROM public.v_champion_power_curve_region
+                   WHERE region = %s;
+                   """
+        df_view = run_query(sql_view, params=(region_name,))        
+    return df_view
+
+@st.cache_data(ttl=600)
+def load_champion_positions (region_name, champ_id):
+    """
+    Функция возвращает данные для графика позиций чемпиона для выбранного региона
+    """
+    sql_view = """
+            SELECT *
+            FROM public.v_champion_positions
+            WHERE region = %s and champion_id = %s ;
+            """
+    df_view = run_query(sql_view, params=(region_name,champ_id))    
+    
+    return df_view
+
 # ======== Блок функций - КОНЕЦ ===================================
 
 # 1. Настройка страницы 
@@ -577,8 +678,8 @@ st.markdown("""
         box-shadow: 0 0 10px rgba(123, 104, 238, 0.5) !important; /* Легкое свечение */
         }
        
-            /* ==============================================================================
-        4. ТОЧЕЧНАЯ СТИЛИЗАЦИЯ КНОПКИ САЙДБАРА (ПРАВОЕ МЕНЮ НЕ ТРОГАЕМ)
+        /* ==============================================================================
+        4. ТОЧЕЧНАЯ СТИЛИЗАЦИЯ КНОПКИ САЙДБАРА 
         ============================================================================== */
 
         /* 1. Уничтожаем багнутый текст "double" строго внутри элементов сайдбара */
@@ -952,25 +1053,8 @@ with tab1:
         # В League of Legends Синяя сторона — это всегда 100, а Красная — 200
         selected_team = 100 if selected_side == 'Синие' else 200
 
-        
-        # 1. Загружаем данные из витрины
-        @st.cache_data
-        def load_bubble_data(team_id, region_name):
-            """
-            Функция получения агрегированных данных из представления
-            """
-            if region_name == "Все регионы":
-                sql_query = "SELECT * FROM public.v_corr_wins_duration WHERE region = 'Все регионы' AND team_id = %s;"
-                # Обязательно передаем team_id, так как в запросе есть %s
-                df_view = run_query(sql_query, params=(team_id,))
-            else:
-                sql_query = "SELECT * FROM public.v_corr_wins_duration_region WHERE region = %s AND team_id = %s;"
-                # Передаем оба параметра строго в том порядке, в котором они идут в SQL
-                df_view = run_query(sql_query, params=(region_name, team_id))
-            
-            return pd.DataFrame(df_view)
-            
-        df_bubble = load_bubble_data(selected_team, selected_region)
+        # Загружаем данные из витрины
+        df_bubble = load_bubble_match_win_time(selected_region, selected_team)
         
         if df_bubble.empty:
             st.warning("Нет данных по этой команде.")
@@ -1578,7 +1662,7 @@ with tab2:
 #================================================================================================================
 # --- ЧЕМПИОНЫ ---
 with tab3:
-    # 1. Загружаем данные для индикаторов для вкладки "Чемпионы"
+    # ЯРУС 1 - Загружаем данные для индикаторов для вкладки "Чемпионы"
     if selected_region == "Все регионы":
         sql_total = "SELECT total_champions_count AS cnt FROM public.v_total_champions_count;"
         total_champions = run_query(sql_total).iloc[0]['cnt']
@@ -1605,7 +1689,7 @@ with tab3:
         sql_total = "SELECT total_avg_gold AS cnt FROM public.v_champions_indicators_region WHERE region = %s;"
         avg_gold = run_query(sql_total, params=(selected_region,)).iloc[0]['cnt']
         
-    # 2. Создаем сетку колонок ДЛЯ ИНДИКАТОРОВ строго ВНУТРИ tab
+    # 2. Создаем сетку колонок ДЛЯ ИНДИКАТОРОВ 
     col_kpi1, col_kpi2, col_kpi3 , col_kpi4 =  st.columns(4)
     
     # 3. Выводим индикаторы в рамке
@@ -1633,16 +1717,13 @@ with tab3:
             value=f"{avg_gold:.2f}".replace(",", " ")
         )        
         
-    # Разделитель между индикаторами и таблицей ниже
-    #st.markdown("<br>", unsafe_allow_html=True)
-    
-    # -----------Графики в 2-х колонках   
+    # ---ЯРУС 2 ----Графики в 2-х колонках   
     # Создаем сетку из 2 колонок одинаковой ширины (пропорция 1:1)
-    col_graph1, col_graph2 = st.columns(2)
+    col_row2_left, col_row2_right = st.columns(2)
     
     # Помещаем график Win Rate в левую收 колонку
-    with col_graph1:
-        st.markdown("### 🏆 Топ чемпионов по Win Rate")
+    with col_row2_left:
+        st.markdown("### 🏆 Топ-15 чемпионов по Win Rate")
             
         # Формируем SQL-запрос к представлению
         if selected_region == "Все регионы":
@@ -1710,8 +1791,8 @@ with tab3:
             st.warning(f"Данные по Win Rate не найдены для региона {selected_region}")
 
     # Помещаем график Pick Rate в правую колонку
-    with col_graph2:
-        st.markdown("### 🔥 Топ чемпионов по Pick Rate")
+    with col_row2_right:
+        st.markdown("### 🔥 Топ-15 чемпионов по Pick Rate")
                 
         if selected_region == "Все регионы":
             sql_view2 = """
@@ -1774,45 +1855,100 @@ with tab3:
             st.warning(f"Данные по Pick Rate не найдены для региона {selected_region}")
 
     # визуальный отступ между рядами
-    st.markdown("<br>", unsafe_allow_html=True)
+    #st.markdown("<br>", unsafe_allow_html=True)
 
-    # ----------- РЯД 2: Графики ниже (в 2 колонки) -----------   
+    # ---ЯРУС 3-----------Графики корреляций -----------   
     # Создаем новую сетку из 2 колонок для нижнего ряда
-    col_row2_left, col_row2_right = st.columns(2)
+    col_row3_left, col_row3_right = st.columns(2)
     
-    # Левая колонка нижнего ряда — Scatter Plot
-    with col_row2_left:
-        st.markdown("### 🎯 Карта агрессии: Убийства vs Смерти")
-        
-        sql_scatter = """
-            SELECT champion_name, avg_kills, avg_deaths, total_matches
-            FROM public.mv_champion_kill_death_stats
-            WHERE region = %s AND total_matches > 10
-            ORDER BY avg_kills DESC;
-        """
-        df_scatter = run_query(sql_scatter, params=(selected_region,))
+    with col_row3_left:
+        st.markdown("### 🔮 Карта игровой меты: Анализ силы и популярности чемпионов")
+        st.markdown(
+            "<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: -0.2rem; margin-bottom: 0.4rem;'>"
+            "Поиск дисбаланса и скрытой меты: соотношение Win Rate & Pick Rate</span>", 
+            unsafe_allow_html=True
+    )
 
-        if not df_scatter.empty:
+
+        df_meta = bubble_champions_winrate_pickrate (selected_region)
+    
+        if not df_meta.empty:
             # Строим Scatter Plot
-            fig_scatter = px.scatter(
-                df_scatter,
+            fig_meta = px.scatter(
+                df_meta, 
+                x="pickrate",           # Популярность по оси X
+                y="winrate",            # Процент побед по оси Y
+                color="winrate",        # Цвет показывает линию (Top, Jungle, Mid...)
+                text="champion_name",   # Имя чемпиона над точкой
+                labels={
+                    "pickrate": "Популярность (Pick Rate, %)", 
+                    "winrate": "Процент побед (Win Rate, %)"
+                },
+                color_continuous_scale=["#662d91", "#bd10e0"]
+            )
+        
+            fig_meta.update_traces(
+                    textposition='top center',
+                    textfont=dict(size=10, color="#a09eb5"), 
+                    marker=dict(opacity=0.8, line=dict(width=1, color="#2d2b54"))
+            )
+
+            fig_meta.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font_color="#ffffff",
+                 coloraxis_showscale=False,
+                    xaxis=dict(showgrid=True, gridcolor="#2d2b54", tickfont=dict(color="#a09eb5")),
+                    yaxis=dict(showgrid=True, gridcolor="#2d2b54", tickfont=dict(color="#ffffff"))
+            )
+            #Выводим график
+            st.plotly_chart(fig_meta, use_container_width=True)
+            
+            # для раскрытия данных
+            show_raw_data_meta = st.checkbox("👁️ Посмотреть сырые данные по карте меты", value=False)
+
+            if show_raw_data_meta:
+                # Оборачиваем в контейнер 
+                st.dataframe(df_meta, use_container_width=True) 
+
+
+        else:
+            st.warning(f"Данные для игровой меты не найдены для региона {selected_region}")
+
+    # 2. Правая колонка 
+    with col_row3_right:
+        st.markdown("### 🎯 Карта агрессии: Убийства vs Смерти")
+        st.markdown(
+        "<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: -0.2rem; margin-bottom: 0.4rem;'>"
+        "Анализ плейстайла: выявление гиперагрессивных лидеров и пассивных игроков</span>", 
+        unsafe_allow_html=True
+        )
+
+
+        df_agg = bubble_champions_kills_deaths(selected_region)
+
+        if not df_agg.empty:
+            # Строим Scatter Plot
+            fig_agg = px.scatter(
+                df_agg,
                 x="avg_deaths",        
                 y="avg_kills",         
                 hover_name="champion_name",
                 text="champion_name",  
                 size="total_matches",  
-                labels={"avg_deaths": "Ср. смертей за матч", "avg_kills": "Ср. убийств за матч"},
+                labels={"avg_deaths": "Ср. смертей за матч", 
+                        "avg_kills": "Ср. убийств за матч"},
                 color="avg_kills",     
                 color_continuous_scale=["#662d91", "#bd10e0"]
             )
 
-            fig_scatter.update_traces(
+            fig_agg.update_traces(
                 textposition='top center',
                 textfont=dict(size=10, color="#a09eb5"), 
                 marker=dict(opacity=0.8, line=dict(width=1, color="#2d2b54"))
             )
 
-            fig_scatter.update_layout(
+            fig_agg.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 font_color="#ffffff",
@@ -1822,24 +1958,194 @@ with tab3:
             )
 
             # Выводим график
-            st.plotly_chart(fig_scatter, use_container_width=True)
+            st.plotly_chart(fig_agg, use_container_width=True)
             
             # для раскрытия данных
-            show_raw_data_1 = st.checkbox("👁️ Посмотреть сырые данные по карте агрессии", value=False)
+            show_raw_data_agg = st.checkbox("👁️ Посмотреть сырые данные по карте агрессии", value=False)
 
-            if show_raw_data_1:
+            if show_raw_data_agg:
                 # Оборачиваем в контейнер 
-                st.dataframe(df_scatter, use_container_width=True)  
+                st.dataframe(df_agg, use_container_width=True)  
 
         else:
             st.warning(f"Данные для карты агрессии не найдены для региона {selected_region}")
 
-    # 2. Правая колонка 
-    with col_row2_right:
-            # Правая колонка нижнего ряда — Bar Chart по позициям
-        st.markdown("### 🗺️ Распределение чемпионов по позициям")
+    # --- ЯРУС 4 -----
+    col_row4_left, col_row4_right = st.columns(2)
+    
+    with col_row4_left:
         
-        # SQL-запрос вытаскивает ТОП-15 самых популярных чемпионов выбранного региона
+        st.markdown("### 🔮 Кривая силы чемпиона по времени игры")
+        st.markdown(
+            "<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: -0.2rem; margin-bottom: 0.4rem;'>"
+            "Выявление ранней силы и лейт-потенциала: винрейт в зависимости от длительности матча:</span>", 
+            unsafe_allow_html=True
+        )
+
+        # Загружаем глобальные данные 
+        df_curve = load_champion_power_curve(selected_region)
+        if not df_curve.empty:
+            # Селектор выбора чемпиона
+            
+            # Создаем словарь соответствия {Имя_Чемпиона: ID_Чемпиона}
+            # drop_duplicates гарантирует, что пары имя-id не будут повторяться
+            champ_mapping = dict(df_curve[['champion_name', 'champion_id']].drop_duplicates().values)
+    
+            # Получаем отсортированный список имен для вывода в selectbox
+            available_champions = sorted(champ_mapping.keys())
+    
+            # Пользователь выбирает ИМЯ чемпиона
+            selected_champ_name = st.selectbox("Выберите чемпиона для анализа темпа:", options=available_champions)
+    
+            #  ВЫТАСКИВАЕМ ID выбранного чемпиона по его имени из нашего словаря
+            selected_champ_id = champ_mapping[selected_champ_name]
+
+    
+            # Фильтруем данные по выбранному чемпиону
+            df_filtered_champ = df_curve[df_curve['champion_id'] == selected_champ_id].sort_values(by='game_duration_interval')
+    
+            if not df_filtered_champ.empty:
+                # Строим интерактивный линейный график
+                fig_curve = px.line(
+                    df_filtered_champ,
+                    x="game_duration_interval",
+                    y="winrate",
+                    markers=True,
+                    text="winrate",
+                    labels={
+                        "game_duration_interval": "Длительность матча",
+                        "winrate": "Процент побед (Win Rate, %)"
+                    }
+                )
+        
+                # Кастомизация под темно-фиолетовый фирменный стиль дашборда
+                fig_curve.update_traces(
+                   line=dict(color='#ba8fff', width=3),       # Мягкий неоновый фиолетовый цвет линии
+                    marker=dict(size=10, color='#e0aaff',      # Светло-фиолетовые маркеры на изгибах
+                            line=dict(color='#241242', width=2)), # Темная обводка точек
+                   textposition="top center",
+                   textfont=dict(color='#e0aaff', size=11)    # Цвет подписей винрейта над точками
+                 )
+        
+                # Настройка фона, сетки и шрифтов осей
+                fig_curve.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)',              # Прозрачный фон подложки
+                    plot_bgcolor='rgba(36, 18, 66, 0.4)',       # Фирменный темно-фиолетовый фон графика
+                    font=dict(color='#a09eb5', family='sans-serif'), # Цвет текста осей
+                    xaxis=dict(
+                    showgrid=True, 
+                    gridcolor='rgba(186, 143, 255, 0.1)',   # Едва заметная фиолетовая сетка
+                    zeroline=False
+                ),
+                yaxis=dict(
+                    showgrid=True, 
+                    gridcolor='rgba(186, 143, 255, 0.1)', 
+                    zeroline=False,
+                    range=[min(df_filtered_champ['winrate'].min() - 5, 40), 
+                           max(df_filtered_champ['winrate'].max() + 5, 60)] # Динамический масштаб осей
+                ),
+                margin=dict(l=20, r=20, t=20, b=20)
+                )
+        
+                # Добавляем эталонную горизонтальную линию баланса 50%
+                fig_curve.add_hline(
+                    y=50.0, 
+                    line_dash="dash", 
+                    line_color="rgba(186, 143, 255, 0.4)",      # Пунктирная фиолетовая линия баланса
+                    annotation_text="Баланс (50%)", 
+                    annotation_font=dict(color='rgba(186, 143, 255, 0.6)', size=10)
+                    )   
+        
+                st.plotly_chart(fig_curve, use_container_width=True)
+            else:
+              st.info("Недостаточно данных для построения графика по этому чемпиону.")
+        else:
+            st.warning("Витрина данных пуста.")
+
+        st.markdown("### 📌 Распределение по игровым позициям")
+        st.markdown(
+            "<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: 0.2rem; margin-bottom: 0.8rem;'>"
+            "Определение основных ролей и флекс-потенциала: популярность позиций для выбранного чемпиона </span>", 
+            unsafe_allow_html=True
+        )
+
+        # Загружаем данные из витрины для позиций чемпионов
+        df_positions = load_champion_positions(selected_region, selected_champ_id) 
+
+        if not df_positions.empty:
+            # Фильтруем данные по ID выбранного чемпиона 
+            df_champ_pos = df_positions[df_positions['champion_id'] == selected_champ_id]
+            
+            if not df_champ_pos.empty:
+                # Строим горизонтальный Stacked Bar Chart
+                
+                # Рассчитываем проценты и сортируем данные по убыванию количества игр
+                total_games_champ = df_champ_pos["games_on_position"].sum()
+                
+                # Считаем процент для каждой строки
+                df_champ_pos["percentage"] = (df_champ_pos["games_on_position"] / total_games_champ * 100).round(1)
+                
+                # Сортируем датафрейм по убыванию, чтобы самые популярные роли шли первыми
+                df_champ_pos = df_champ_pos.sort_values(by="games_on_position", ascending=True)
+                
+                # Создаем красивую текстовую подпись для вывода ВНУТРИ сегментов (например: "MID (65.2%)")
+                df_champ_pos["text_label"] = df_champ_pos["team_position"] + " (" + df_champ_pos["percentage"].astype(str) + "%)"
+
+                # 2. Строим горизонтальный Stacked Bar Chart
+                fig_pos = px.bar(
+                    df_champ_pos,
+                    x="games_on_position",   # Длина сегмента по-прежнему зависит от количества игр
+                    y="champion_name",      
+                    color="team_position",   
+                    orientation="h",        
+                    text="text_label",       # выводим подпись с процентами
+                    labels={"games_on_position": "Матчи",
+                            "team_position": "Позиция",
+                            "champion_name": "Чемпион",
+                            "text_label": "%"}, # тултипы
+                    color_discrete_sequence=["#bd10e0", "#662d91", "#00bfff", "#4a90e2", "#b8e986"]
+                )
+                
+                # 💜 Стилизация текста и границ сегментов под ваш Hextech UI
+                fig_pos.update_traces(
+                    textposition="inside",                  
+                    insidetextanchor="middle",              
+                    textfont=dict(color='#241242', size=11, weight='bold'), 
+                    marker=dict(line=dict(color='#241242', width=2)) 
+                )
+                
+                fig_pos.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)',           
+                    plot_bgcolor='rgba(0,0,0,0)',            
+                    font=dict(color='#a09eb5', family='sans-serif'),
+                    showlegend=True,                         
+                    legend=dict(
+                        title_text="Роли:",
+                        font=dict(color='#a09eb5', size=10),
+                        bgcolor='rgba(36, 18, 66, 0.6)'      
+                    ),
+                    # Полностью отключаем оси, чтобы они не съедали пиксели высоты
+                    xaxis=dict(showgrid=False, visible=False),
+                    yaxis=dict(showgrid=False, visible=False),
+                    margin=dict(l=0, r=0, t=0, b=0),       # Сжимаем внутренние поля графика до нуля
+                    height=150                               
+                )
+                
+                st.plotly_chart(fig_pos, use_container_width=True)
+
+                st.markdown("<div style='height: 150px;'></div>", unsafe_allow_html=True)
+
+            else:
+                st.info("Нет данных о позициях для этого чемпиона.")
+        else:
+            st.warning("Витрина позиций пуста.")
+
+        
+    with col_row4_right:
+         # Правая колонка нижнего ряда — Bar Chart по позициям
+        st.markdown("### 🗺️ Распределение ТОП-15 чемпионов по позициям")
+        
+        # SQL-запрос для ТОП-15 самых популярных чемпионов выбранного региона
         sql_positions = """
             WITH top_champs AS (
                 SELECT champion_name, SUM(games_on_position) as total_games
@@ -1892,5 +2198,6 @@ with tab3:
 
         else:
             st.warning(f"Данные по позициям не найдены для региона {selected_region}")
-
-    #st.plotly_chart(fig_empty, use_container_width=True)
+    
+    
+        
