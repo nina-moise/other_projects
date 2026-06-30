@@ -497,7 +497,7 @@ def bubble_champions_kills_deaths(region_name):
         avg_kills,
         avg_deaths,
         total_matches
-        FROM public.mv_champion_kill_death_stats
+        FROM public.v_champion_kill_death_stats
         WHERE region = %s AND total_matches > 10
         ORDER BY avg_kills DESC;
         """
@@ -537,6 +537,40 @@ def load_champion_positions (region_name, champ_id):
     df_view = run_query(sql_view, params=(region_name,champ_id))    
     
     return df_view
+
+@st.cache_data(ttl=600)
+def get_champion_agg(region_name, champ_id):
+    """
+    Загружает данные из v_champion_kill_death_stats для выбранного региона и чемпиона
+    """
+    sql_view = """
+               SELECT champion_name, avg_kills, avg_deaths 
+               FROM public.v_champion_kill_death_stats 
+               WHERE region = %s and champion_id = %s ;
+               """
+    df_view = run_query(sql_view, params=(region_name,champ_id))    
+    return df_view
+
+@st.cache_data(ttl=600)
+def get_champion_winrate_pickrate(region_name, champ_id):
+    """ 
+    Функция возвращает данные winrate_pickrate для выбранного чемпиона и региона   
+    """
+    if region_name == "Все регионы":
+        sql_view = """
+                SELECT *
+                FROM public.v_champions_kpi
+                WHERE champion_id = %s;
+                """
+        df_view = run_query(sql_view, params=(champ_id,))
+    else:    
+        sql_view = """
+                SELECT *
+                FROM public.v_champions_kpi_region
+                WHERE region = %s and champion_id = %s;
+                """
+        df_view = run_query(sql_view, params=(region_name, champ_id))
+    return df_view  
 
 # ======== Блок функций - КОНЕЦ ===================================
 
@@ -681,16 +715,33 @@ st.markdown("""
         /* ==============================================================================
         4. ТОЧЕЧНАЯ СТИЛИЗАЦИЯ КНОПКИ САЙДБАРА 
         ============================================================================== */
+                /* ==============================================================================
+        4. ТОЧЕЧНАЯ СТИЛИЗАЦИЯ КНОПКИ САЙДБАРА 
+        ============================================================================== */
 
-        /* 1. Уничтожаем багнутый текст "double" строго внутри элементов сайдбара */
+        /* 1. Ломаем системный шрифт и контент, чтобы "double_arrow_light" физически не мог отрендериться */
+        [data-testid="stSidebarCollapseButton"] button,
         [data-testid="stSidebarCollapseButton"] button *,
+        button[data-testid="collapsedControl"],
         button[data-testid="collapsedControl"] * {
-            display: none !important;
-            opacity: 0 !important;
-            font-size: 0px !important;
+            font-family: Arial, sans-serif !important; /* Убираем Material-шрифт, ломаем чтение иконки */
+            font-size: 0px !important;                 /* Обнуляем размер букв */
+            color: transparent !important;             /* Делаем буквы прозрачными */
+            line-height: 0 !important;
+            text-shadow: none !important;              /* Убираем тени букв */
         }
 
-        /* 2. Стилизуем кнопку сайдбара, когда он ОТКРЫТ */
+        /* Полностью очищаем встроенные псевдоэлементы Streamlit, где и может сидеть багнутый текст */
+        [data-testid="stSidebarCollapseButton"] button::after,
+        [data-testid="stSidebarCollapseButton"] button::before,
+        button[data-testid="collapsedControl"]::after,
+        button[data-testid="collapsedControl"]::before {
+            content: "" !important;
+            font-size: 0px !important;
+            color: transparent !important;
+        }
+
+        /* 2. Стилизуем каркас кнопки сайдбара, когда он ОТКРЫТ */
         [data-testid="stSidebarCollapseButton"] button {
             opacity: 1 !important;
             background-color: #252440 !important;   /* Темно-фиолетовый фон */
@@ -706,21 +757,23 @@ st.markdown("""
             position: relative !important;
         }
 
-        /* Рисуем стрелочку ВЛЕВО на кнопке внутри открытого сайдбара */
-        [data-testid="stSidebarCollapseButton"] button::before {
-            content: "‹" !important;                
-            color: #B0A8E2 !important;              
+        /* Создаем СВОЙ ЧИСТЫЙ изолированный слой для стрелочки ВЛЕВО, защищенный от багов */
+        [data-testid="stSidebarCollapseButton"] button::after {
+            content: "‹" !important;                /* Наша стрелочка */
+            color: #B0A8E2 !important;              /* Лавандовый цвет */
             font-size: 28px !important;             
             font-family: Arial, sans-serif !important;
+            font-weight: normal !important;
             line-height: 1 !important;
             display: block !important;
             position: absolute !important;
             top: 45% !important;
             left: 50% !important;
             transform: translate(-50%, -50%) !important;
+            opacity: 1 !important;                  /* Делаем её видимой */
         }
 
-        /* 3. Стилизуем кнопку сайдбара, когда он ЗАКРЫТ (она появляется в шапке слева) */
+                /* 3. Стилизуем кнопку сайдбара, когда он ЗАКРЫТ (в шапке) */
         [data-testid="stHeader"] button[aria-label="Open sidebar"],
         [data-testid="stHeader"] button[data-testid="collapsedControl"] {
             opacity: 1 !important;
@@ -735,20 +788,26 @@ st.markdown("""
             transition: all 0.2s ease !important;
             cursor: pointer !important;
             position: relative !important;
-            margin-left: 12px !important;           /* Отступ от левого края экрана */
+            margin-left: 12px !important;           
             margin-top: 6px !important;
         }
 
-        /* Прячем багнутый текст внутри закрытой кнопки */
+        /* Вырезаем системный текст и псевдоэлементы внутри закрытой кнопки */
         [data-testid="stHeader"] button[aria-label="Open sidebar"] *,
-        [data-testid="stHeader"] button[data-testid="collapsedControl"] * {
-            display: none !important;
+        [data-testid="stHeader"] button[data-testid="collapsedControl"] *,
+        [data-testid="stHeader"] button[aria-label="Open sidebar"]::before,
+        [data-testid="stHeader"] button[aria-label="Open sidebar"]::after,
+        [data-testid="stHeader"] button[data-testid="collapsedControl"]::before,
+        [data-testid="stHeader"] button[data-testid="collapsedControl"]::after {
+            font-family: Arial, sans-serif !important;
+            content: "" !important;
             font-size: 0px !important;
+            color: transparent !important;
         }
 
-        /* Рисуем стрелочку ВПРАВО на кнопке открытия сайдбара */
-        [data-testid="stHeader"] button[aria-label="Open sidebar"]::before,
-        [data-testid="stHeader"] button[data-testid="collapsedControl"]::before {
+        /* Рисуем СВОЮ чистую стрелочку ВПРАВО на закрытой кнопке */
+        [data-testid="stHeader"] button[aria-label="Open sidebar"]::after,
+        [data-testid="stHeader"] button[data-testid="collapsedControl"]::after {
             content: "›" !important;                
             color: #B0A8E2 !important;              
             font-size: 28px !important;             
@@ -759,7 +818,9 @@ st.markdown("""
             top: 45% !important;
             left: 50% !important;
             transform: translate(-50%, -50%) !important;
+            opacity: 1 !important;
         }
+
 
         /* 4. Подсветка кнопок сайдбара при наведении (правое меню не изменится) */
         [data-testid="stSidebarCollapseButton"] button:hover,
@@ -827,16 +888,16 @@ if st.sidebar.button("🔄 Обновить данные из БД"):
     st.rerun()            # Принудительно перезапускает страницу
 #=========================================================================
 # --- БЛОК 1: Сайдбар  с фильтрами ---
-st.sidebar.header("Фильтры")
+st.sidebar.header("🝖")
+st.sidebar.info("🌐 **Фильтр**: Выбор региона (`EUW1` / `NA1` / `Все регионы`) автоматически пересчитывает данные, графики и метрики на всех вкладках дашборда.")
 regions = ["Все регионы", "EUW1", "NA1", ]
 selected_region = st.sidebar.selectbox("Выберите игровой регион:", options=regions)
 st.write(f"Выбранный регион: {selected_region}")
 
-
 # --- БЛОК 2: СОЗДАНИЕ ВКЛАДОК (ЛИСТОВ) ---
 
 # Создаем вкладки с названиями и иконками
-tab1, tab2, tab3  = st.tabs(["⚔️Матчи", "🔮Игроки", "🛡️Чемпионы"])
+tab1, tab2, tab3, tab4  = st.tabs(["⚔️Матчи", "🔮Игроки", "🛡️Чемпионы", "ℹ️ О дашборде"])
 
 #================================================================================================================    
 # --- МАТЧИ ---
@@ -1632,52 +1693,97 @@ with tab2:
                 
                 # Помещаем сюда  карточки или st.container
                 with st.container(border=True):
+                    # Внедряем CSS, который применится только внутри этого контейнера
+                    st.markdown(
+                        """
+                        <style>
+                        div[data-testid="stVerticalBlock"] [data-testid="stMetricLabel"] {
+                            font-size: 14px !important;
+                            font-weight: 500 !important;
+                        }
+                        div[data-testid="stVerticalBlock"] [data-testid="stMetricValue"] {
+                            font-size: 20px !important;
+                            font-weight: bold !important;
+                        }
+                        </style>
+                        """,
+                        unsafe_allow_html=True
+                        )
+                    
                     st.markdown(f"### Статистика для {player_data['player_name']}")
                     
                     # --- ОТРИСОВКА ИНДИКАТОРОВ В ОТДЕЛЬНЫХ РАМОЧКАХ ---
                     # Создаем сетку из 3 колонок, чтобы индикаторы встали в ряды друг под другом
                     ind_col1, ind_col2, ind_col3 = st.columns(3, gap="small")
-
+                    
                     with ind_col1:
+                        wins_curr = player_data['wins_current'] if player_data['wins_current'] is not None else 0
+                        losses_curr = player_data['losses_current'] if player_data['losses_current'] is not None else 0
+                        total_curr_games = wins_curr + losses_curr
+
                         st.metric(label="Регион", value=str(player_data['region']))
                         st.metric(label="Всего матчей в лиге", value=f"{int(player_data['wins'] + player_data['losses']):,} игр")
-                        st.metric(label="В сезоне: матчей", value=f"{int(player_data['wins_current'] + player_data['losses_current']):,} игр")
-                        
+                        st.metric(label="В сезоне: матчей", value=f"{int(total_curr_games):,} игр")
 
                     with ind_col2:
-                        st.metric(label="Лига", value=str(player_data['league_type']))
-                        st.metric(label="Win Rate", value=f"{player_data['winrate']}%")
-                        st.metric(label="В сезоне: средний KDA ", value=str(player_data['avg_kda']))
+                        st.metric(label="Лига", value=str(player_data['league_type']) if player_data['league_type'] is not None else "Нет лиги")
+    
+                        winrate_val = player_data['winrate'] if player_data['winrate'] is not None else 0
+                        st.metric(label="Win Rate", value=f"{winrate_val}%")
                         
+                        # Защита среднего KDA
+                        avg_kda_val = player_data['avg_kda'] if player_data['avg_kda'] is not None else "0.0"
+                        st.metric(label="В сезоне: средний KDA ", value=str(avg_kda_val))    
 
                     with ind_col3:
-                        st.metric(label="Текущие очки", value=f"{int(player_data['lp']):,} LP")
-                        st.metric(label="Заработанное золото", value=f"{int(player_data['gold_earned']):,} ")
-                        st.metric(label="В сезоне: индекс агрессии (K/A)", value=str(player_data['avg_ka']))
+                         # Защита текущих очков LP
+                        lp_val = player_data['lp'] if player_data['lp'] is not None else 0
+                        st.metric(label="Текущие очки", value=f"{int(lp_val):,} LP")
+                        
+                        # Защита заработанного золота
+                        gold_val = player_data['gold_earned'] if player_data['gold_earned'] is not None else 0
+                        st.metric(label="Заработанное золото", value=f"{int(gold_val):,} ")
+                        
+                        # Защита индекса агрессии
+                        avg_ka_val = player_data['avg_ka'] if player_data['avg_ka'] is not None else "0.0"
+                        st.metric(label="В сезоне: индекс агрессии (K/A)", value=str(avg_ka_val))
 
-                # Фавориты
-                with st.container(border=True):
+                    # Фавориты
+                
                     st.markdown(f"### Предпочтения в текущем сезоне:")        
                     df_favorites = find_player_favorites(player_data['puuid'])
-                    fav_data = df_favorites.iloc[0]
 
+                    # Проверяем, вернул ли датафрейм хоть какие-то строки
+                    if df_favorites is not None and not df_favorites.empty:
+                        fav_data = df_favorites.iloc[0]
+
+                        # Логика для красивого отображения стороны
+                        team_raw = str(fav_data['team']).strip() if fav_data['team'] is not None else ""
+                        team_display = "🔴 Красная" if "Красн" in team_raw or "200" in team_raw else "🔵 Синяя"
+
+                        # Логика для красивого отображения позиции (иконок-эмодзи)
+                        pos_raw = str(fav_data['team_position']).upper() if fav_data['team_position'] is not None else ""
+                        pos_emojis = {"TOP": "⚔️ Top", "JUNGLE": "🌲 Jungle", "MIDDLE": "🧙‍♂️ Mid", "BOTTOM": "🏹 Bot", "UTILITY": "🛡️ Support"}
+                        pos_display = pos_emojis.get(pos_raw, "Не определена")
+
+                        # Логика для отображения чемпиона
+                        champion_display = str(fav_data['champion_name']) if fav_data['champion_name'] is not None else "Нет данных"
+                    else:
+                        # Дефолтные значения, если у игрока еще нет сыгранных матчей
+                        team_display = "Нет данных"
+                        pos_display = "Нет данных"
+                        champion_display = "Нет данных"
+
+                    # Отрисовка колонок 
                     ind_col4, ind_col5, ind_col6 = st.columns(3, gap="small")
-
-                    # Логика для красивого отображения стороны
-                    team_raw = str(fav_data['team']).strip()
-                    team_display = "🔴 Красная" if "Красн" in team_raw or "200" in team_raw else "🔵 Синяя"
-
-                    # Логика для красивого отображения позиции (иконок-эмодзи)
-                    pos_raw = str(fav_data['team_position']).upper()
-                    pos_emojis = {"TOP": "⚔️ Top", "JUNGLE": "🌲 Jungle", "MIDDLE": "🧙‍♂️ Mid", "BOTTOM": "🏹 Bot", "UTILITY": "🛡️ Support"}
-                    pos_display = pos_emojis.get(pos_raw, pos_raw)
 
                     with ind_col4:
                         st.metric(label="Команда", value=team_display)
                     with ind_col5:    
                         st.metric(label="Позиция", value=pos_display)
                     with ind_col6: 
-                        st.metric(label="Чемпион", value=str(fav_data['champion_name']))
+                        st.metric(label="Чемпион", value=champion_display)
+
 
  
     else:
@@ -1892,20 +1998,25 @@ with tab3:
             "<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: -0.2rem; margin-bottom: 0.4rem;'>"
             "Поиск дисбаланса и скрытой меты: соотношение Win Rate & Pick Rate</span>", 
             unsafe_allow_html=True
-    )
+        )
 
+        df_meta = bubble_champions_winrate_pickrate(selected_region)
 
-        df_meta = bubble_champions_winrate_pickrate (selected_region)
-    
         if not df_meta.empty:
+            # Рассчитываем динамическое среднее для популярности (ось X)
+            # Если среднее слишком мало/велико, можно поставить фиксированное (например, 10.0)
+            mean_pickrate = df_meta["pickrate"].mean() 
+            target_winrate = 50.0  # Идеальный баланс побед (ось Y)
+
             # Строим Scatter Plot
             fig_meta = px.scatter(
                 df_meta, 
                 x="pickrate",           # Популярность по оси X
                 y="winrate",            # Процент побед по оси Y
-                color="winrate",        # Цвет показывает линию (Top, Jungle, Mid...)
-                text="champion_name",   # Имя чемпиона над точкой
+                color="winrate",        
+                text="champion_name",   
                 labels={
+                    "champion_name": "Чемпион", 
                     "pickrate": "Популярность (Pick Rate, %)", 
                     "winrate": "Процент побед (Win Rate, %)"
                 },
@@ -1918,42 +2029,81 @@ with tab3:
                     marker=dict(opacity=0.8, line=dict(width=1, color="#2d2b54"))
             )
 
+            # --- ДОБАВЛЕНИЕ ЛИНИЙ КВАДРАНТОВ ---
+            # Горизонтальная линия (Win Rate = 50%)
+            fig_meta.add_hline(
+                y=target_winrate, 
+                line_dash="dash", 
+                line_color="#7B68EE", 
+                line_width=1.5,
+                opacity=0.7
+            )
+            # Вертикальная линия (Средний Pick Rate)
+            fig_meta.add_vline(
+                x=mean_pickrate, 
+                line_dash="dash", 
+                line_color="#7B68EE", 
+                line_width=1.5,
+                opacity=0.7
+            )
+
             fig_meta.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
                     font_color="#ffffff",
-                 coloraxis_showscale=False,
+                    coloraxis_showscale=False,
                     xaxis=dict(showgrid=True, gridcolor="#2d2b54", tickfont=dict(color="#a09eb5")),
                     yaxis=dict(showgrid=True, gridcolor="#2d2b54", tickfont=dict(color="#ffffff"))
             )
-            #Выводим график
+
+            # --- ДОБАВЛЕНИЕ ПОДПИСЕЙ КВАДРАНТОВ ---
+            # Получаем границы графика для правильного позиционирования текста
+            x_max = df_meta["pickrate"].max() * 1.05
+            y_max = df_meta["winrate"].max() * 1.01
+            y_min = df_meta["winrate"].min() * 0.99
+
+            # Точечно расставляем маркеры квадрантов по углам графика
+            fig_meta.add_annotation(x=x_max, y=y_max, text="🔥 МЕТА (S-тир)", showarrow=False, font=dict(color="#bd10e0", size=10), xanchor="right")
+            fig_meta.add_annotation(x=0, y=y_max, text="💎 СКРЫТЫЕ ИМБЫ", showarrow=False, font=dict(color="#7B68EE", size=10), xanchor="left")
+            fig_meta.add_annotation(x=x_max, y=y_min, text="🏹 ПЕРЕОЦЕНЕННЫЕ", showarrow=False, font=dict(color="#a09eb5", size=10), xanchor="right")
+            fig_meta.add_annotation(x=0, y=y_min, text="🚨 ВНЕ МЕТЫ", showarrow=False, font=dict(color="#662d91", size=10), xanchor="left")
+
+            # Выводим график
             st.plotly_chart(fig_meta, use_container_width=True)
             
             # для раскрытия данных
             show_raw_data_meta = st.checkbox("👁️ Посмотреть сырые данные по карте меты", value=False)
 
             if show_raw_data_meta:
-                # Оборачиваем в контейнер 
                 st.dataframe(df_meta, use_container_width=True) 
-
 
         else:
             st.warning(f"Данные для игровой меты не найдены для региона {selected_region}")
 
-    # 2. Правая колонка 
+
+        # 2. Правая колонка 
     with col_row3_right:
         st.markdown("### 🎯 Карта агрессии: Убийства vs Смерти")
         st.markdown(
         "<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: -0.2rem; margin-bottom: 0.4rem;'>"
-        "Анализ плейстайла: выявление гиперагрессивных лидеров и пассивных игроков</span>", 
+        "Анализ плейстайла: выявление гиперагрессивных и пассивных чемпионов</span>", 
         unsafe_allow_html=True
         )
-
 
         df_agg = bubble_champions_kills_deaths(selected_region)
 
         if not df_agg.empty:
-            # Строим Scatter Plot
+            # Считаем динамические средние значения для осей баланса
+            mean_deaths = df_agg["avg_deaths"].mean()
+            mean_kills = df_agg["avg_kills"].mean()
+
+            # Вычисляем границы данных, чтобы график «дышал» свободно
+            x_min = df_agg["avg_deaths"].min()
+            x_max = df_agg["avg_deaths"].max()
+            y_min = df_agg["avg_kills"].min()
+            y_max = df_agg["avg_kills"].max()
+
+            # Строим Scatter Plot без каких-либо ручных ограничений range
             fig_agg = px.scatter(
                 df_agg,
                 x="avg_deaths",        
@@ -1961,7 +2111,9 @@ with tab3:
                 hover_name="champion_name",
                 text="champion_name",  
                 size="total_matches",  
-                labels={"avg_deaths": "Ср. смертей за матч", 
+                labels={"champion_name": "Чемпион",
+                        "total_matches": "Матчей",
+                        "avg_deaths": "Ср. смертей за матч", 
                         "avg_kills": "Ср. убийств за матч"},
                 color="avg_kills",     
                 color_continuous_scale=["#662d91", "#bd10e0"]
@@ -1973,6 +2125,32 @@ with tab3:
                 marker=dict(opacity=0.8, line=dict(width=1, color="#2d2b54"))
             )
 
+            # --- ДОБАВЛЕНИЕ ЛИНИЙ КВАДРАНТОВ ---
+            # Горизонтальная линия (Средние убийства)
+            fig_agg.add_hline(
+                y=mean_kills, 
+                line_dash="dash", 
+                line_color="#7B68EE", 
+                line_width=1.5,
+                opacity=0.5
+            )
+            # Вертикальная линия (Средние смерти)
+            fig_agg.add_vline(
+                x=mean_deaths, 
+                line_dash="dash", 
+                line_color="#7B68EE", 
+                line_width=1.5,
+                opacity=0.5
+            )
+
+            # Диагональная линия баланса Kills = Deaths, привязанная ТОЛЬКО к диапазону данных (без 0)
+            fig_agg.add_shape(
+                type="line",
+                x0=x_min, y0=x_min, x1=x_max, y1=x_max,
+                line=dict(color="#bd10e0", width=1.5, dash="longdash"),
+                opacity=0.4
+            )
+
             fig_agg.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
@@ -1982,6 +2160,18 @@ with tab3:
                 yaxis=dict(showgrid=True, gridcolor="#2d2b54", tickfont=dict(color="#ffffff"))
             )
 
+            # --- ДОБАВЛЕНИЕ ПОДПИСЕЙ КВАДРАНТОВ С УЧЕТОМ ДИНАМИЧЕСКИХ ГРАНИЦ ---
+            # Слегка расширяем отступы для текста, чтобы он не сливался с крайними точками
+            text_x_min = x_min * 0.98
+            text_x_max = x_max * 1.02
+            text_y_min = y_min * 0.98
+            text_y_max = y_max * 1.02
+
+            fig_agg.add_annotation(x=text_x_min, y=text_y_max, text="⚡ ЭЛИТНЫЕ КЕРРИ", showarrow=False, font=dict(color="#bd10e0", size=10), xanchor="left", yanchor="top")
+            fig_agg.add_annotation(x=text_x_max, y=text_y_max, text="⚔️ ГИПЕРАГРЕССИВНЫЕ", showarrow=False, font=dict(color="#7B68EE", size=10), xanchor="right", yanchor="top")
+            fig_agg.add_annotation(x=text_x_min, y=text_y_min, text="🛡️ КОНТРОЛИРУЮЩИЕ", showarrow=False, font=dict(color="#a09eb5", size=10), xanchor="left", yanchor="bottom")
+            fig_agg.add_annotation(x=text_x_max, y=text_y_min, text="🚨 СЛАБЫЕ В МЕТЕ", showarrow=False, font=dict(color="#662d91", size=10), xanchor="right", yanchor="bottom")
+
             # Выводим график
             st.plotly_chart(fig_agg, use_container_width=True)
             
@@ -1989,11 +2179,13 @@ with tab3:
             show_raw_data_agg = st.checkbox("👁️ Посмотреть сырые данные по карте агрессии", value=False)
 
             if show_raw_data_agg:
-                # Оборачиваем в контейнер 
                 st.dataframe(df_agg, use_container_width=True)  
 
         else:
             st.warning(f"Данные для карты агрессии не найдены для региона {selected_region}")
+
+
+
 
     # --- ЯРУС 4 -----
     col_row4_left, col_row4_right = st.columns(2)
@@ -2087,84 +2279,60 @@ with tab3:
         else:
             st.warning("Витрина данных пуста.")
 
-        st.markdown("### 📌 Распределение по игровым позициям")
-        st.markdown(
-            "<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: 0.2rem; margin-bottom: 0.8rem;'>"
-            "Определение основных ролей и флекс-потенциала: популярность позиций для выбранного чемпиона </span>", 
-            unsafe_allow_html=True
-        )
 
-        # Загружаем данные из витрины для позиций чемпионов
-        df_positions = load_champion_positions(selected_region, selected_champ_id) 
+        # Загружаем данные из карты агрессии для выбранного чемпиона
+        df_champ = get_champion_agg(selected_region, selected_champ_id)
 
-        if not df_positions.empty:
-            # Фильтруем данные по ID выбранного чемпиона 
-            df_champ_pos = df_positions[df_positions['champion_id'] == selected_champ_id]
+        # Загружаем данные из карты меты для выбранного чемпиона
+        df_champ_meta =  get_champion_winrate_pickrate (selected_region, selected_champ_id)
+
+        if df_champ.empty is not None and not df_champ.empty and df_champ_meta.empty is not None and not df_champ_meta.empty:
+            # Проверяем, что база вернула данные и датафрейм не пустой
+            # Извлекаем значения из датафрейма
+            champ_row = df_champ.iloc[0]
+            champ_name = str(champ_row['champion_name'])
+            avg_kills = float(champ_row['avg_kills'])
+            avg_deaths = float(champ_row['avg_deaths'])
+            # Рассчитываем чистый KDA для вывода в карточку (с защитой от деления на ноль)
+            kda_value = round(avg_kills / avg_deaths, 2) if avg_deaths > 0 else round(avg_kills / 1.0, 2)
+
+            champ_meta_row = df_champ_meta.iloc[0]
+            winrate = champ_meta_row['winrate']
+            pickrate = champ_meta_row['pickrate']    
+                        
             
-            if not df_champ_pos.empty:
-                # Строим горизонтальный Stacked Bar Chart
+            # Оборачиваем карточку в рамку st.container(border=True)
+            with st.container(border=True):
+                st.markdown(f"#### 🛡️ Боевая статистика: {champ_name}")
                 
-                # Рассчитываем проценты и сортируем данные по убыванию количества игр
-                total_games_champ = df_champ_pos["games_on_position"].sum()
+                # Создаем 3 колонки под метрики
+                card_col1, card_col2, card_col3 = st.columns(3)
                 
-                # Считаем процент для каждой строки
-                df_champ_pos["percentage"] = (df_champ_pos["games_on_position"] / total_games_champ * 100).round(1)
-                
-                # Сортируем датафрейм по убыванию, чтобы самые популярные роли шли первыми
-                df_champ_pos = df_champ_pos.sort_values(by="games_on_position", ascending=True)
-                
-                # Создаем красивую текстовую подпись для вывода ВНУТРИ сегментов (например: "MID (65.2%)")
-                df_champ_pos["text_label"] = df_champ_pos["team_position"] + " (" + df_champ_pos["percentage"].astype(str) + "%)"
+                with card_col1:
+                    st.metric(label="⚔️ Ср. убийств за матч", value=f"{avg_kills:.2f}")
+                    
+                with card_col2:
+                    st.metric(label="💀 Ср. смертей за матч", value=f"{avg_deaths:.2f}")
+                    
+                with card_col3:
+                    # Подсвечиваем KDA чемпиона
+                    st.metric(label="📊 Итоговый KDA", value=f"{kda_value:.2f}")
 
-                # 2. Строим горизонтальный Stacked Bar Chart
-                fig_pos = px.bar(
-                    df_champ_pos,
-                    x="games_on_position",   # Длина сегмента по-прежнему зависит от количества игр
-                    y="champion_name",      
-                    color="team_position",   
-                    orientation="h",        
-                    text="text_label",       # выводим подпись с процентами
-                    labels={"games_on_position": "Матчи",
-                            "team_position": "Позиция",
-                            "champion_name": "Чемпион",
-                            "text_label": "%"}, # тултипы
-                    color_discrete_sequence=["#bd10e0", "#662d91", "#00bfff", "#4a90e2", "#b8e986"]
-                )
-                
-                # 💜 Стилизация текста и границ сегментов под ваш Hextech UI
-                fig_pos.update_traces(
-                    textposition="inside",                  
-                    insidetextanchor="middle",              
-                    textfont=dict(color='#241242', size=11, weight='bold'), 
-                    marker=dict(line=dict(color='#241242', width=2)) 
-                )
-                
-                fig_pos.update_layout(
-                    paper_bgcolor='rgba(0,0,0,0)',           
-                    plot_bgcolor='rgba(0,0,0,0)',            
-                    font=dict(color='#a09eb5', family='sans-serif'),
-                    showlegend=True,                         
-                    legend=dict(
-                        title_text="Роли:",
-                        font=dict(color='#a09eb5', size=10),
-                        bgcolor='rgba(36, 18, 66, 0.6)'      
-                    ),
-                    # Полностью отключаем оси, чтобы они не съедали пиксели высоты
-                    xaxis=dict(showgrid=False, visible=False),
-                    yaxis=dict(showgrid=False, visible=False),
-                    margin=dict(l=0, r=0, t=0, b=0),       # Сжимаем внутренние поля графика до нуля
-                    height=150                               
-                )
-                
-                st.plotly_chart(fig_pos, use_container_width=True)
+            with st.container(border=True):
+                st.markdown(f"#### 🔮 Показатели в мете: {champ_name}")
+        
+                # Создаем 2  колонки
+                card_col1, card_col2 = st.columns(2)
+        
+                with card_col1:
+                    st.metric(label="🏆 Процент побед (Win Rate)", value=f"{winrate:.2f}%")
+            
+                with card_col2:
+                    st.metric(label="🌪️ Популярность (Pick Rate)", value=f"{pickrate:.2f}%")
 
-                st.markdown("<div style='height: 150px;'></div>", unsafe_allow_html=True)
-
-            else:
-                st.info("Нет данных о позициях для этого чемпиона.")
         else:
-            st.warning("Витрина позиций пуста.")
-
+            # Заглушка на случай, если по связке регион+ID в представлении пусто
+            st.warning("Статистика по данному чемпиону в выбранном регионе отсутствует.")
         
     with col_row4_right:
          # Правая колонка нижнего ряда — Bar Chart по позициям
@@ -2215,14 +2383,376 @@ with tab3:
             
                                   
             # для раскрытия данных
-            show_raw_data_2 = st.checkbox("👁️ Посмотреть сырые данные по позициям", value=False)
+            #show_raw_data_2 = st.checkbox("👁️ Посмотреть сырые данные по позициям", value=False)
 
-            if show_raw_data_2:
+            #if show_raw_data_2:
                 # Оборачиваем в контейнер 
-                st.dataframe(df_pos, use_container_width=True)                    
+            #    st.dataframe(df_pos, use_container_width=True)                    
 
         else:
             st.warning(f"Данные по позициям не найдены для региона {selected_region}")
+        
+        #  пустая строки
+        st.markdown("#") 
+        with st.container(border=True):
+            # ---- ниже идут  данные по выбранному чемпиону
+            st.markdown(f"### 📌 Распределение по игровым позициям для {selected_champ_name}")
+            st.markdown(
+                "<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: 0.2rem; margin-bottom: 0.8rem;'>"
+                "Популярность позиций для выбранного чемпиона </span>", 
+                unsafe_allow_html=True
+            )
+        
+            # Загружаем данные из витрины для позиций чемпионов
+            df_positions = load_champion_positions(selected_region, selected_champ_id) 
+
+            if not df_positions.empty:
+                # Фильтруем данные по ID выбранного чемпиона 
+                df_champ_pos = df_positions[df_positions['champion_id'] == selected_champ_id]
+            
+                if not df_champ_pos.empty:
+                    # Строим горизонтальный Stacked Bar Chart
+                
+                    # Рассчитываем проценты и сортируем данные по убыванию количества игр
+                    total_games_champ = df_champ_pos["games_on_position"].sum()
+                
+                    # Считаем процент для каждой строки
+                    df_champ_pos["percentage"] = (df_champ_pos["games_on_position"] / total_games_champ * 100).round(1)
+                
+                    # Сортируем датафрейм по убыванию, чтобы самые популярные роли шли первыми
+                    df_champ_pos = df_champ_pos.sort_values(by="games_on_position", ascending=True)
+                
+                    # Создаем текстовую подпись для вывода ВНУТРИ сегментов (например: "MID (65.2%)")
+                    df_champ_pos["text_label"] = df_champ_pos["team_position"] + " (" + df_champ_pos["percentage"].astype(str) + "%)"
+
+                    # Строим горизонтальный Stacked Bar Chart
+                    fig_pos = px.bar(
+                        df_champ_pos,
+                        x="games_on_position",   # Длина сегмента по-прежнему зависит от количества игр
+                        y="champion_name",      
+                        color="team_position",   
+                        orientation="h",        
+                        text="text_label",       # выводим подпись с процентами
+                        labels={"games_on_position": "Матчи",
+                                "team_position": "Позиция",
+                                "champion_name": "Чемпион",
+                                "text_label": "%"}, # тултипы
+                        color_discrete_sequence=["#bd10e0", "#662d91", "#00bfff", "#4a90e2", "#b8e986"]
+                    )
+                
+                    # Стилизация текста и границ сегментов под UI
+                    fig_pos.update_traces(
+                        textposition="inside",                  
+                        insidetextanchor="middle",              
+                        textfont=dict(color='#241242', size=11, weight='bold'), 
+                        marker=dict(line=dict(color='#241242', width=2)) 
+                    )
+                
+                    fig_pos.update_layout(
+                        paper_bgcolor='rgba(0,0,0,0)',           
+                        plot_bgcolor='rgba(0,0,0,0)',            
+                        font=dict(color='#a09eb5', family='sans-serif'),
+                        showlegend=True,                         
+                        legend=dict(
+                            title_text="Роли:",
+                            font=dict(color='#a09eb5', size=10),
+                            bgcolor='rgba(36, 18, 66, 0.6)'      
+                        ),
+                        # Полностью отключаем оси, чтобы они не съедали пиксели высоты
+                        xaxis=dict(showgrid=False, visible=False),
+                        yaxis=dict(showgrid=False, visible=False),
+                        margin=dict(l=0, r=0, t=0, b=0),       # Сжимаем внутренние поля графика до нуля
+                        height=150                               
+                    )
+                
+                    st.plotly_chart(fig_pos, use_container_width=True)
+
+                    
+                else:
+                    st.info("Нет данных о позициях для этого чемпиона.")
+            else:
+                st.warning("Витрина позиций пуста.")
     
+    # Добавляем путое место внизу дашборда            
+    st.markdown("<div style='height: 150px;'></div>", unsafe_allow_html=True)            
+#================================================================================================================
+# --- О ДАШБОРДЕ ---
+with tab4:   
+    # Вводная карточка
+    st.markdown("""
+    **Этот дашборд** — интерактивный инструмент для аналитики и мониторинга игровых показателей игроков в **League of Legends**.
+    Проект объединяет данные о матчах 50 самых активных игроков 3-х лиг (`CHALLENGER`, `MASTER`, `GRANDMASTER`) на 2-х игровых серверах (`EUW1`, `NA1`) в мае 2026 г.
     
+    Цель: выявление реальной игровой формы, предпочтений и эффективности киберспортсменов и участников лиги. Выявление инсайтов по игровым чемпионам.
+    """)
+
+    # Раздел 1: Источники данных
+    st.markdown("### 🔌 Источники данных и актуальность")
+    st.markdown("""
+    * **База данных**: Информация хранится в реляционной базе данных **Supabase**.
+    * **Сбор данных**: Первичным источником является официальный **API Riot Games**. Данные - за май 2026 (собирались в июне 2026)
+    * **Глобальная фильтрация**: Выбор игрового сервера (`EUW1` или `NA1`) в боковой панели является сквозным и пересчитывает результаты на всех вкладках дашборда под конкретный регион. Также возможен выбор "Все регионы" - сумма `EUW1` + `NA1`.
+    * **Дополнительная фильтрация:**  Выбранный ранг (`CHALLENGER`, `MASTER` или `GRANDMASTER`) на странице "Игроки" сужает список киберспортсменов, влияя на данные этой страницы.
+    """)
+
+    # Раздел 2: Методология расчетов 
+    st.markdown("### 📊 Методология расчета ключевых метрик")
+    
+    # Оборачиваем всю строку с колонками в один контейнер с рамкой 
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **🏆 Win Rate (Процент побед)**  
+
+            Рассчитывается для лиги (на основе общего официального профиля в лиге) и для сезона:  
+        
+            $$\\text{Win Rate} = \\frac{\\text{Победы} \\times 100}{\\text{Победы} + \\text{Поражения}}$$  
+            """)
+        
+        with col2:
+            st.markdown("**🏆 Интерпретация Win Rate**")
+            st.markdown("Показатель отражает общую турнирную стабильность и успешность киберспортсмена.")
+        
+            # Внедряем уменьшенный шрифт специально для текста интерпретации
+            st.markdown("""
+            <style>
+            .small-text {
+                font-size: 13px !important;
+                line-height: 1.5 !important;
+            }
+            .small-text ul {
+                margin-top: 5px !important;
+                padding-left: 20px !important;
+            }
+            .small-text li {
+                margin-bottom: 8px !important;
+            }
+            </style>
+        
+            <div class="small-text">
+            📊 Аналитическая шкала Win Rate:<br><br>
+            <ul>
+                <li>🚨 <b>Ниже 48% — Критический спад (Loss Streak / Тренды «на вылет»)</b><br>
+                Сигнализирует о серьезных проблемах игрока в текущей мета-версии игры или о затяжной серии поражений. На высоких рангах удерживать аккаунт с таким винрейтом на длинной дистанции невозможно — игрок стремительно теряет очки (LP) и падает в лиге.</li>
+                <li>⚖️ <b>От 49% до 52% — Стабильное плато (Баланс сил)</b><br>
+                Игрок находится на своем «истинном» рейтинге. Система подбора (MMR) идеально балансирует его силу против равных соперников. Продвижение по рангам происходит медленно и зависит исключительно от точечных победных серий.</li>
+                <li>📈 <b>От 53% до 57% — Уверенный рост (В отличной форме)</b><br>
+                Показатель качественного превосходства над текущим дивизионом. Игрок отлично адаптировался к патчу, имеет стабильный пул сильных чемпионов и уверенно продвигается вверх по таблице лидеров.</li>
+                <li>⚡ <b>Выше 58% — Доминация (Смурфинг / Профессиональный уровень)</b><br>
+                Аномально высокий показатель для элитных лиг. Означает, что на сервере находится профессиональный киберспортсмен топ-уровня в пиковой форме либо игрок, совершающий стремительный рывок в топ-1 региона (Speedrun).</li>
+            </ul>
+            <br>
+            <i>💡 <b>Важный нюанс дашборда</b>: При анализе всегда сопоставляйте Win Rate с метрикой <b>«Всего матчей»</b>. Винрейт 60% на 15 играх может быть случайным везением, но те же 60% на дистанции в 200+ матчей — признак безоговорочного мастерства.</i>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **⚔️ Средний KDA (Убийства / Смерти / Содействия)**  
+        
+            Показывает среднее соотношение полезных действий к ошибкам за сезон.  
+        
+            *Формула индивидуального матча*:  
+            $$\\text{KDA} = \\frac{\\text{Kills} + \\text{Assists}}{\\text{Deaths}}$$  
+                    
+            """)
+        
+        with col2:
+            st.markdown("**⚔️ Интерпретация KDA**")
+            st.markdown("Показатель отражает индивидуальную дисциплину, позиционирование в драках и общую полезность игрока.")
+        
+           
+            st.markdown("""
+            <div class="small-text">
+            📊 Аналитическая шкала KDA (для High Elo лиг):<br><br>
+            <ul>
+                <li>🚨 <b>Ниже 2.0 — Критический уровень (Проблемы с позиционированием)</b><br>
+                Игрок слишком часто погибает или не успевает вносить вклад в командные сражения. Для высоких рангов это маркер слабой макро-игры или затяжного кризиса формы.</li>
+                <li>⚖️ <b>От 2.0 до 3.0 — Стабильная норма (Рабочий показатель)</b><br>
+                Хороший баланс между агрессией и выживаемостью. Стандартный показатель для большинства активных игроков, которые стабильно выполняют свои задачи на карте.</li>
+                <li>📈 <b>От 3.0 до 4.5 — Высокая эффективность (Лидер команды)</b><br>
+                Отличный показатель, говорящий о высокой игровой дисциплине. Игрок редко совершает критические ошибки, грамотно выбирает моменты для драк и вносит огромный вклад в победы.</li>
+                <li>⚡ <b>Выше 4.5 — Топ-уровень (Безупречная игра / Hard Carry)</b><br>
+                Аномально высокий результат для элитных лиг. Означает тотальное доминирование на карте, идеальное позиционирование в тимфайтах и филигранное чтение игры.</li>
+            </ul>
+            <br>
+            <i>💡 <b>Важный нюанс дашборда</b>: Всегда учитывайте игровую роль. Для ролей поддержки (Support) высокий KDA формируется за счет содействий (Assists), а для ключевых керри (Bot, Mid) — за счет чистых убийств (Kills).</i>
+            </div>
+            """, unsafe_allow_html=True)
+
+    
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **🎯 Индекс агрессии (K/A)**  
+        
+            Показывает вовлеченность игрока в атакующий потенциал команды и долю личных убийств в его общей активности:  
+        
+            $$\\text{Индекс K/A} = \\frac{\\text{Kills}}{\\text{Assists} + \\text{Kills}}$$  
+        
+        """)
+        
+    with col2:
+        st.markdown("**🎯 Интерпретация Индекса K/A**")
+        st.markdown("Показатель отражает игровой стиль киберспортсмена — от пассивного командного игрока до выраженного единоличного финишера.")
+        
+        # Выводим шкалу интерпретации с уменьшенным шрифтом 13px
+        st.markdown("""
+        <div class="small-text">
+        📊 Аналитическая шкала Индекса K/A:<br><br>
+        <ul>
+            <li>🛡️ <b>Ниже 0.35 — Выраженный командный стиль (Плеймейкер / Саппорт)</b><br>
+            В игровой активности преобладают содействия (Assists). Игрок выступает в роли инициатора драк, ассистента или защитника. Типично для ролей поддержки (Support) и танков на Топ-лейне.</li>
+            <li>⚖️ <b>От 0.36 до 0.50 — Универсальный баланс (Гибридный стиль)</b><br>
+            Игрок одинаково эффективен как в завершении атак, так и в помощи команде. Он подстраивается под ситуацию: может забрать фраг сам или оставить его союзнику для общего блага.</li>
+            <li>🏹 <b>От 0.51 до 0.65 — Фокус на ликвидацию (Main Carry)</b><br>
+            Личные убийства (Kills) начинают преобладать над ассистами. Игрок является основным «наконечником копья» команды. Характерно для сильных стрелков (Bot) и убийц на Мид-лейне.</li>
+            <li>⚡ <b>Выше 0.65 — Эгоистичный стиль (Hard Solo Carry / Финишер)</b><br>
+            Подавляющее большинство результативных действий игрока — это личные фраги. Игрок стягивает на себя все золото с убийств, забирая ресурсы для единоличного доминирования в поздней стадии игры.</li>
+        </ul>
+        <br>
+        <i>💡 <b>Важный нюанс дашборда</b>: Высокий индекс агрессии не означает, что игрок играет лучше остальных. Он лишь подсвечивает его тактическую роль. Команда с идеальным балансом ролей всегда имеет игроков как с низким, так и с высоким индексом K/A.</i>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **🩸 Индекс кровавости матча (KPM)**  
+        
+            Определяет среднее количество убийств в минуту среди всех участников сражения. Используется для разделения матчей на «вязкие» (тактические) и «кровавые» (с постоянными драками):  
+        
+            $$\\text{Текущая кровавость матча} = \\frac{\\text{Kills (Team A)} + \\text{Kills (Team B)}}{\\text{Match Duration (minutes)}}$$  
+            """)
+        
+        with col2:
+            st.markdown("**🩸 Интерпретация Индекса KPM**")
+            st.markdown("Метрика оценивает общий темп игры, агрессивность команд и плотность боевых действий на карте.")
+        
+            # Выводим шкалу интерпретации с уменьшенным шрифтом 13px
+            st.markdown("""
+            <div class="small-text">
+            📊 Аналитическая шкала Индекса KPM (для матча длиной 30 минут):<br><br>
+            <ul>
+            <li>📉 <b>Ниже 1.20 — Низкая кровавость («Вязкая» игра)</b><br>
+            Спокойный, тактический матч с акцентом на макро-контроль и фарм объектов. Суммарно на карте происходит менее 35-40 убийств. Характерно для профессиональной про-сцены (LCK/LCS).</li>
+            <li>⚖️ <b>От 1.20 до 1.80 — Средняя кровавость (Стандарт)</b><br>
+            Классическая динамичная игра для высокого рейтинга. Фраги происходят регулярно, но команды соблюдают баланс между драками и контролем карты.</li>
+            <li>🔥 <b>Выше 1.80 — Высокая кровавость («Мясорубка»)</b><br>
+            Гиперагрессивные матчи, где стычки идут непрерывно по всей карте, а игроки постоянно ищут рискованные файты с первых минут.<br>
+            </li>
+        </ul>
+        <br>
+        <i>💡 <b>Важный нюанс дашборда</b>: Высокий KPM часто сигнализирует о большом количестве грубых ошибок с обеих сторон, в то время как низкий KPM на высоких рангах обычно указывает на идеальное чтение карты и выверенную позиционную игру.</i>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Раздел 3: Анализ графиков 
+    st.markdown("### 📊 Анализ графиков")
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
+      
+        with col1:
+            st.markdown("""
+                **📊 Карта игровой меты чемпионов (Win Rate vs Pick Rate)**  
+               Инструмент визуализации, который сопоставляет частоту выбора чемпиона (**Pick Rate**) и его успешность (**Win Rate**). 
+               Позволяет мгновенно оценить баланс текущего патча и определить, какие персонажи объективно сильнее остальных.
+        
+            $$\\text{Pick Rate} = \\frac{\\text{Матчи с участием чемпиона}}{\\text{Всего сыгранных матчей}} \\times 100\\%$$
+            """)
+        
+        with col2:
+            st.markdown("**📊 Интерпретация карты меты чемпионов**")
+            st.markdown("Положение чемпиона на осях графика определяет его текущий статус в экосистеме игры:")
+            st.markdown("""
+             <div class="small-text">
+            График делится на 4 ключевые зоны (квадранта):<br><br>
+            <ul>
+                <li>🔥 <b>Высокий Pick Rate / Высокий Win Rate — Абсолютная Мета (S-тир)</b><br>
+                Самые сильные и популярные чемпионы патча. Их берут часто, и они стабильно побеждают. Эти персонажи обязательны к освоению, либо должны отправляться в бан на стадии выбора героев.</li>
+                <li>💎 <b>Низкий Pick Rate / Высокий Win Rate — Скрытые имбы (A-тир)</b><br>
+                «Секретное оружие» лиги. На них играют редко (часто только узкий круг профильных специалистов — OTP), но они показывают аномально высокую эффективность. Отличный выбор для неожиданного пика.</li>
+                <li>🏹 <b>Высокий Pick Rate / Низкий Win Rate — Переоцененные (B/C-тир)</b><br>
+                Популярные чемпионы, которые часто выбираются из-за слепой любви игроков или старой привычки, но объективно проигрывают в текущем патче. Сигнал о том, что персонаж слаб или сложен для SoloQ.</li>
+                <li>🚨 <b>Низкий Pick Rate / Низкий Win Rate — Вне меты (D-тир)</b><br>
+                Слабые или забытые персонажи. Они непопулярны и имеют низкий процент побед. Требуют серьезного усиления (баффа) от разработчиков Riot Games в следующих обновлениях.</li>
+            </ul>
+            <br>
+            <i>💡 <b>Важный нюанс дашборда</b>: Идеальная точка баланса для большинства чемпионов — это геометрический центр графика (Win Rate около 50% при среднем Pick Rate 8–12%).</i>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **🎯Карта агрессии чемпиона (Убийства vs Смерти)**  
+
+            Позволяет мгновенно определить игровой стиль - агрессию и пассивность.
+        
+            $$\\text{Линия баланса} \\implies \\text{Kills} = \\text{Deaths} \\quad (\\text{Ratio} = 1.0)$$
+            """)
+        
+        with col2:
+            st.markdown("**🎯 Интерпретация карты агрессии чемпионов**")
+            st.markdown("Положение на осях графика наглядно делит чемпионов на 4 тактических типа в зависимости от их геймплейной роли:")
+
+            # Выводим шкалу интерпретации квадрантов агрессии для чемпионов (13px)
+            st.markdown("""
+            <div class="small-text">
+            График разделен на 4 ключевые зоны архетипов чемпионов:<br><br>
+            <ul>
+                <li>⚡ <b>Высокие Убийства / Низкие Смерти — Эффективные ликвидаторы (S-тир Керри)</b><br>
+                Персонажи с колоссальным потенциалом для уничтожения целей и встроенными механизмами побега. Они эффективно забирают фраги, но сами остаются неуловимыми для соперника. Сильнейшие опции для победы в текущем патче.</li>
+                <li>⚔️ <b>Высокие Убийства / Высокие Смерти — Разменивающиеся (Гиперагрессивный стиль)</b><br>
+                Обычно это чемпионы-дуэлянты, ассасины-камикадзе или дайверы, чья механика завязана на агрессивный врыв. Они гарантированно забирают цель, но часто погибают сразу после этого. Создают хаос и разгоняют темп матча.</li>
+                 <li>🛡️ <b>Низкие Убийства / Низкие Смерти — Контролирующие (Тактический/Сейвовый стиль)</b><br>
+                Надежные персонажи, ориентированные на командную утилитарность, защиту союзников и макро-контроль. Они редко подставляются под удар, имеют высокий уровень выживаемости, но не предназначены для совершения соло-убийств. Типично для Танков и Саппортов.</li>
+                <li>🚨 <b>Низкие Убийства / Высокие Смерти — Слабые в мете (Проблемные чемпионы)</b><br>
+                Персонажи, которые сильно проседают в текущем балансе. Им не хватает урона для ликвидации врагов, а отсутствие защитных механик делает их легкой мишенью. Выбор этих героев сильно усложняет игру и требует пересмотра со стороны разработчиков.</li>
+            </ul>
+            <br>
+            <i>💡 <b>Важный нюанс дашборда</b>: Диагональная линия, проходящая через центр графика, разделяет персонажей с положительным боевым балансом (в среднем совершают больше убийств, чем умирают) и отрицательным (чаще погибают, выполняя роль «мяса» или инициаторов).</i>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+
+    # Подвал
+    st.info("💡 **Совет по использованию**: Если при выборе игрока в блоке предпочтений или сезонных метрик вы видите надпись *«Нет данных»*, это означает, что данный игрок успешно зарегистрирован в базе, но еще не сыграл ни одного матча в рамках отслеживаемого сезона.")
+
+    st.markdown("---") # разделительная линия
+    st.markdown("""
+        <style>
+        .footer-text {
+            font-size: 12px !important;
+            color: #808495 !important;
+            text-align: left !important;
+            margin-top: 20px !important;
+        }
+        .footer-text a {
+            color: #7B68EE !important; /* цвет для ссылки */
+            text-decoration: none !important;
+        }
+        .footer-text a:hover {
+            text-decoration: underline !important; /* Подчеркивание при наведении */
+        }
+        </style>
+    
+        <div class="footer-text">
+            Разработчик: <b>Нина Моисеева, июнь 2026</b> | 
+            📂 Проект на <a href="https://github.com/nina-moise/other_projects/tree/main/LOL">GitHub</a>
+        </div>
+        """, unsafe_allow_html=True)
+        
         
