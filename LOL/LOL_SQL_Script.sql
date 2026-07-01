@@ -212,24 +212,26 @@ FROM top_champions_metrics;
 -- Витрина для scatter-plot зависимостей средних убийств от смертей по чемпионам
 SELECT 
     split_part(p.match_id, '_', 1) AS region,
+    nc.champion_id,
     nc.champion_name,
     COUNT(*) AS total_matches,
     ROUND(AVG(p.kills)::numeric, 2) AS avg_kills,
     ROUND(AVG(p.deaths)::numeric, 2) AS avg_deaths
 FROM public.lol_players_matches AS p
 JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id
-GROUP BY split_part(p.match_id, '_', 1), nc.champion_name
+GROUP BY split_part(p.match_id, '_', 1), nc.champion_id, nc.champion_name
 UNION ALL
 -- Блок 2: Глобальная статистика по ВСЕМ регионам вместе (записываем регион как 'Все регионы')
 SELECT 
     'Все регионы' AS region,
+    nc.champion_id,
     nc.champion_name,
     COUNT(*) AS total_matches,
     ROUND(AVG(p.kills)::numeric, 2) AS avg_kills,
     ROUND(AVG(p.deaths)::numeric, 2) AS avg_deaths
 FROM public.lol_players_matches AS p
 JOIN public.nsi_champions AS nc ON nc.champion_id = p.champion_id
-GROUP BY nc.champion_name;
+GROUP BY nc.champion_id, nc.champion_name;
 
 -- Витрина для анализа гибкости позиций игровых чемпионов
 SELECT 
@@ -675,7 +677,7 @@ select * from LP_all_region
 order by region, league_type, lp_bucket;
 
 
----- Список игроков с характеристиками
+---- Список игроков с характеристиками v_player_kpi
 -- Сначала каждой игры рассчитаем показатели по игроку - avg_kda и avg_ka - уровень агрессии, а затем возьмем средние данные по игроку
 with players_matches_kpi as (
 select	puuid,
@@ -694,32 +696,47 @@ select	puuid,
 		END AS kda,
 		ROUND(kills::numeric / NULLIF(assists + kills, 0), 2) as ka
 from public.lol_players_matches 
+),
+-- Считаем все агрегаты по матчам ДО соединения с игроками
+aggregated_matches AS (
+    SELECT 
+        puuid,
+        COUNT(match_id) AS total_games,
+        SUM(win) AS wins_current,
+        SUM(losses) AS losses_current,
+        SUM(kills) AS kills,
+        SUM(deaths) AS deaths,
+        SUM(assists) AS assists,
+        SUM(gold_earned) AS gold_earned,
+        SUM(gold_spent) AS gold_spent,
+        ROUND(AVG(kda), 2) AS avg_kda,
+        ROUND(AVG(ka), 2) AS avg_ka
+    FROM players_matches_kpi
+    GROUP BY puuid
 )
 --- присоединяем имя, группируем по игроку и считаем среднее по игроку + WinRate
-select	p.puuid,
-		p.region,
-		p.league_type,
-		COALESCE(p.riot_id_game_name || '#' || p.riot_id_game_name, p.puuid) as player_name,
-		sum(p.league_points) as lp, 
-		sum(p.wins) as wins,
-		sum(p.losses) as losses,
-		count(pm.match_id) as total_games,
-		sum(pm.win) as wins_current,
-		sum(pm.losses) as losses_current,
-		sum(pm.kills) as kills,
-		sum(pm.deaths) as deaths,
-		sum(pm.assists) as assists,
-		sum(pm.gold_earned) as gold_earned,
-		sum(pm.gold_spent) as gold_spent,
-		ROUND(sum((p.wins) * 100.0)::numeric / NULLIF(sum(p.wins) + sum(p.losses), 1),2) AS winrate,
-		round(avg(pm.kda),2) as avg_kda,
-		round(avg(pm.ka),2) as avg_ka
-from players_matches_kpi as pm 
-join  public.lol_players as p on p.puuid=pm.puuid 
-group by	p.region,
-			p.league_type,
-			COALESCE(p.riot_id_game_name || '#' || p.riot_id_game_name, p.puuid),
-			p.puuid;
+SELECT	
+    p.puuid,
+    p.region,
+    p.league_type,
+    COALESCE(p.riot_id_game_name || '#' || p.riot_id_tagline, p.puuid) AS player_name, 
+    p.league_points AS lp,       
+    p.wins AS wins,            
+    p.losses AS losses,         
+    am.total_games,
+    am.wins_current,
+    am.losses_current,
+    am.kills,
+    am.deaths,
+    am.assists,
+    am.gold_earned,
+    am.gold_spent,
+    ROUND((p.wins * 100.0)::numeric / NULLIF(p.wins + p.losses, 0), 2) AS winrate,
+    am.avg_kda,
+    am.avg_ka
+FROM public.lol_players AS p
+-- Используем LEFT JOIN, чтобы игрок вывелся, даже если у него еще нет сыгранных матчей в базе
+LEFT JOIN aggregated_matches AS am ON p.puuid = am.puuid;
 
 --- Предпочитаемый чемпион, позиция и команда
 WITH main_players AS (
