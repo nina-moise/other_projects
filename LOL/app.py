@@ -2381,11 +2381,11 @@ with tab3:
         with st.container(border=True):
             # ---- ниже идут  данные по выбранному чемпиону
             st.markdown(f"### 📌 Распределение по игровым позициям для {selected_champ_name}")
-            st.markdown(
-                "<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: 0.2rem; margin-bottom: 0.8rem;'>"
-                "Популярность позиций для выбранного чемпиона </span>", 
-                unsafe_allow_html=True
-            )
+            # st.markdown(
+            #     "<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: 0.2rem; margin-bottom: 0.8rem;'>"
+            #     "Популярность позиций для выбранного чемпиона </span>", 
+            #     unsafe_allow_html=True
+            # )
         
             # Загружаем данные из витрины для позиций чемпионов
             df_positions = load_champion_positions(selected_region, selected_champ_id) 
