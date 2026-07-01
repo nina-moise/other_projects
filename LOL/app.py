@@ -48,9 +48,43 @@ def run_query(query, params=None):
     """
     return pd.read_sql(query, engine, params=params)
 
+# Декоратор для кеша
+@st.cache_data(ttl=600)
+def count_matches_date(region_name):
+    """
+    Функция возвращает данные для линейного графика - Количество матчей по дням
+    """
+    sql_view = """
+    SELECT  region,
+            match_date,
+            games_count
+    FROM public.v_matches_date
+    WHERE region =  %s;;
+    """
+    df_view = run_query(sql_view, params=(selected_region,))
+
+    return pd.DataFrame(df_view)
+
+@st.cache_data(ttl=600)
+def count_players_date(region_name):
+    """
+    Функция возвращает данные для линейного графика - Количество уникальных игроков по дням - DAU
+    """
+    sql_view = """
+               SELECT  region,
+                       match_date,
+                       players_count
+                FROM public.v_players_date
+                WHERE region = %s;
+                """
+    df_view = run_query(sql_view, params=(region_name,))
+    return pd.DataFrame(df_view)
+
+
+@st.cache_data(ttl=600)
 def load_boxplot_data(region_name):
     """
-    Функция получения агрегированных данных из представления
+    Функция получает данные для ящика с усами - зависимость длины матча от патча
     """
     if region_name == "Все регионы":
         sql_query = "SELECT * FROM public.v_boxplot_duration_patch WHERE region = 'Все регионы';"
@@ -60,7 +94,6 @@ def load_boxplot_data(region_name):
         df_view = run_query(sql_query, params=(region_name,))
     return pd.DataFrame(df_view)
 
-# Декоратор для кеша
 @st.cache_data(ttl=600)
 def load_side_winrate(region_name):
     """
@@ -715,10 +748,7 @@ st.markdown("""
         /* ==============================================================================
         4. ТОЧЕЧНАЯ СТИЛИЗАЦИЯ КНОПКИ САЙДБАРА 
         ============================================================================== */
-                /* ==============================================================================
-        4. ТОЧЕЧНАЯ СТИЛИЗАЦИЯ КНОПКИ САЙДБАРА 
-        ============================================================================== */
-
+        
         /* 1. Ломаем системный шрифт и контент, чтобы "double_arrow_light" физически не мог отрендериться */
         [data-testid="stSidebarCollapseButton"] button,
         [data-testid="stSidebarCollapseButton"] button *,
@@ -773,7 +803,7 @@ st.markdown("""
             opacity: 1 !important;                  /* Делаем её видимой */
         }
 
-                /* 3. Стилизуем кнопку сайдбара, когда он ЗАКРЫТ (в шапке) */
+        /* 3. Стилизуем кнопку сайдбара, когда он ЗАКРЫТ (в шапке) */
         [data-testid="stHeader"] button[aria-label="Open sidebar"],
         [data-testid="stHeader"] button[data-testid="collapsedControl"] {
             opacity: 1 !important;
@@ -893,18 +923,15 @@ st.sidebar.info("🌐 **Фильтр**: Выбор региона (`EUW1` / `NA1
 regions = ["Все регионы", "EUW1", "NA1", ]
 selected_region = st.sidebar.selectbox("Выберите игровой регион:", options=regions)
 st.write(f"Выбранный регион: {selected_region}")
-
+#=========================================================================
 # --- БЛОК 2: СОЗДАНИЕ ВКЛАДОК (ЛИСТОВ) ---
-
-# Создаем вкладки с названиями и иконками
 tab1, tab2, tab3, tab4  = st.tabs(["⚔️Матчи", "🔮Игроки", "🛡️Чемпионы", "ℹ️ О дашборде"])
-
-#================================================================================================================    
+#=========================================================================    
 # --- МАТЧИ ---
-
+#=========================================================================
 with tab1:
     # ----------- Ярус 1 - Индикаторы ---------------------------
-    # 1. Загружаем данные для индикаторов для вкладки "Матчи"
+    # Загружаем данные для индикаторов для вкладки "Матчи"
     if selected_region == "Все регионы":
         # Убрали params, так как в SQL нет знака %s
         sql_total = "SELECT total_matches AS cnt FROM public.v_matches_indicators_region WHERE region = 'Все регионы';"
@@ -932,7 +959,7 @@ with tab1:
         sql_total = "SELECT avg_players_day AS cnt FROM public.v_avg_players_day WHERE region = %s;"
         avg_players_day = run_query(sql_total, params=(selected_region,)).iat[0, 0]
     
-    # 2. Создаем сетку колонок ДЛЯ ИНДИКАТОРОВ строго ВНУТРИ tab2
+    # Создаем сетку колонок ДЛЯ ИНДИКАТОРОВ 
     col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
     
     # 3. Выводим индикаторы в рамке
@@ -944,19 +971,19 @@ with tab1:
         
     with col_kpi2:
         st.metric(
-            label="Среднее количество матчей в день", 
+            label="Ср. матчей в день", 
             value=f"{avg_games_day:,}".replace(".", ",")
         )
         
     with col_kpi3:
         st.metric(
-            label="Средняя длительность матча, мин", 
+            label="Ср. длительность матча, мин", 
             value=f"{avg_duration_minutes:.2f}".replace(".", ",")
         )
 
     with col_kpi4:
         st.metric(
-            label="Среднее кол-во уникальных игроков в день", 
+            label="Ср. игроков в день", 
             value=f"{int(avg_players_day):,}".replace(",", " ")
         )        
         
@@ -964,38 +991,18 @@ with tab1:
     # ----------- КОНЕЦ Ярус 1 - Индикаторы ---------------------------
     
     # ----------- Ярус 2 - Графики по дням  ---------------------------
-    
     # -----------Графики в 2-х колонках   
-    # 1. Создаем сетку из 2 колонок одинаковой ширины (пропорция 1:1)
+    # сетка из 2 колонок одинаковой ширины (пропорция 1:1)
     tier2_col1, tier2_col2 = st.columns(2)
     
-    # 2. Помещаем ПЕРВЫЙ график (Количество игр по дням) в левую колонку
+    # график (Количество игр по дням) в левую колонку
     with tier2_col1:
         st.markdown("### 🎮 Количество матчей в день")
-            
-        # 1. Формируем SQL-запрос к представлению
-        if selected_region == "Все регионы":
-            sql_view1 = """
-            SELECT  region,
-                    match_date,
-                    games_count
-            FROM public.v_matches_date
-            WHERE region = 'Все регионы';
-            """
-            df_view1 = run_query(sql_view1)
-        else:
-            sql_view1 = """
-            SELECT  region,
-                    match_date,
-                    games_count
-            FROM public.v_matches_date
-            WHERE region = %s;
-            """
-            df_view1 = run_query(sql_view1, params=(selected_region,))
-        
-        # 2. Отрисовка линейного графика
-        if not df_view1.empty:
-            fig_games = px.line(df_view1, x="match_date", y="games_count")
+        df_line_graf_matches =  count_matches_date(selected_region)   
+                
+        # Отрисовка линейного графика
+        if not df_line_graf_matches.empty:
+            fig_games = px.line(df_line_graf_matches, x="match_date", y="games_count")
             fig_games.update_traces(line=dict(color="#7777e9", width=3), mode="lines+markers")
             fig_games.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#ffffff")
             st.plotly_chart(fig_games, use_container_width=True)
@@ -1005,41 +1012,23 @@ with tab1:
         # ---- Конец вывода 2 ярус 1 колонка
 
     # ---- Ярус 2 2 колонка --------------    
-
-    # 3. Помещаем ВТОРОЙ график (Количество уникальных игроков по дням / DAU) в правую колонку
+    
+    # (Количество уникальных игроков по дням / DAU) в правую колонку
     with tier2_col2:
         st.markdown("### 👥 Количество уникальных игроков в день (DAU)")
-                
-        # 1. Формируем SQL-запрос к представлению v_players_date
-        if selected_region == "Все регионы":
-            sql_view2 = """
-            SELECT  region,
-                    match_date,
-                    players_count
-            FROM public.v_players_date
-            WHERE region = 'Все регионы';
-            """
-            df_view2 = run_query(sql_view2)
-        else:
-            sql_view2 = """
-            SELECT  region,
-                    match_date,
-                    players_count
-            FROM public.v_players_date
-            WHERE region = %s;
-            """
-            df_view2 = run_query(sql_view2, params=(selected_region,))
         
-        # 2. Отрисовка линейного графика DAU
-        if not df_view2.empty:
+        df_line_graf_players = count_players_date(selected_region)    
+        
+        # Отрисовка линейного графика DAU
+        if not df_line_graf_players.empty:
             fig_players = px.line(
-                df_view2, 
+                df_line_graf_players, 
                 x="match_date", 
                 y="players_count",
                 labels={"match_date": "Дата", "players_count": "Уникальные игроки (DAU)"}
             )
             
-            # Стилизуем под лавандовый неон для идеальной симметрии с левым графиком
+            # Стилизуем под лавандовый неон 
             fig_players.update_traces(
                 line=dict(color="#7777e9", width=3), 
                 mode="lines+markers"
@@ -1051,7 +1040,7 @@ with tab1:
                 font_color="#ffffff"
             )
             
-            # Выводим график на страницу (use_container_width сожмет его ровно в 50% экрана)
+            # Выводим график на страницу (use_container_width сожмет его в 50% экрана)
             st.plotly_chart(fig_players, use_container_width=True)
         else:
             st.warning("Данные по уникальным игрокам (DAU) отсутствуют")
@@ -1059,15 +1048,12 @@ with tab1:
     # ----------- Ярус 3 - Команды  ---------------------------
     # -----------Графики в 2-х колонках   
     
-    # 1. Создаем сетку из 2 колонок одинаковой ширины (пропорция 1:1)
+    # 1. Создаем сетку из 2 колонок одинаковой ширины (пропорция )
     tier3_col1, tier3_col2 = st.columns([0.4, 0.6])
-
            
     with tier3_col1:
        # === ЯРУС 2 1 КОЛОНКА: Круговая диаграмма
 
-        # Добавляем разделитель и заголовок для нового графика
-        #st.markdown("---")
         st.markdown("<h4 style='margin-bottom: 0.1rem; padding-bottom: 0rem;'>🔵🔴 Общий баланс сторон (Win Rate)</h4>", unsafe_allow_html=True)
    
         df_side = load_side_winrate(selected_region)
@@ -1075,7 +1061,7 @@ with tab1:
         if df_side.empty:
             st.warning("Нет данных по победам сторон.")
         else:
-            # Мапим ID команд в понятные текстовые названия
+            # Мапим ID команд в текстовые названия
             labels_map = {100: 'Синие', 200: 'Красные'}
             df_side['side_name'] = df_side['team_id'].map(labels_map)
                 
@@ -1083,9 +1069,9 @@ with tab1:
             fig_donut = go.Figure(data=[go.Pie(
                 labels=df_side['side_name'],
                 values=df_side['wins'],
-                hole=.5, # Задает размер "дырки" внутри, превращая круг в кольцо
+                hole=.5, # Задает размер "дырки" внутри
                 marker=dict(
-                colors=['#2c7bb6', '#d7191c'], # Спокойные синий и красный цвета
+                colors=['#2c7bb6', '#d7191c'], #  синий и красный цвета
                 line=dict(color='#1e1e1e', width=1) # Тонкая темная обводка
                 ),
                 textinfo='percent+label',
@@ -1094,24 +1080,25 @@ with tab1:
                 
             fig_donut.update_layout(
                 height=300,
-                margin=dict(l=10, r=10, t=10, b=10),
+                #margin=dict(l=10, r=10, t=10, b=10),
+                margin=dict(l=0, r=10, t=10, b=10),
                 showlegend=False,
                 template="plotly_white",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)"
                 )
-                
+        # Добавляем микро-отступ, чтобы сдвинуть график вниз. 
+        st.html("<div style='margin-top: 60px;'></div>")         
+
         st.plotly_chart(fig_donut, use_container_width=True)
-        
-     
-
-
+    
     # === ВТОРАЯ КОЛОНКА: ПУЗЫРЬКОВАЯ ДИАГРАММА КОРРЕЛЯЦИИ ===
     with tier3_col2:
         st.subheader("🔮 Корреляция исхода матча и времени")
         
         selected_side = st.selectbox("Выберите команду:",  options=['Синие', 'Красные'])
-        # В League of Legends Синяя сторона — это всегда 100, а Красная — 200
+        
+        # Синяя сторона —  100, Красная — 200
         selected_team = 100 if selected_side == 'Синие' else 200
 
         # Загружаем данные из витрины
@@ -1120,7 +1107,7 @@ with tab1:
         if df_bubble.empty:
             st.warning("Нет данных по этой команде.")
         else:
-            # 2. Построение пузырьковой диаграммы в Plotly
+            # Построение пузырьковой диаграммы  
             fig_bubble = go.Figure()
 
             max_matches = df_bubble['total_matches'].max()
@@ -1150,7 +1137,7 @@ with tab1:
                 text=df_bubble['total_matches']
             ))
 
-            # Слой 2: Сглаженный лавандовый тренд
+            # Слой 2: Сглаженный тренд
             df_trend = df_bubble[df_bubble['total_matches'] >= 5]
             if not df_trend.empty:
                 fig_bubble.add_trace(go.Scatter(
@@ -1191,7 +1178,7 @@ with tab1:
     # ----------- Ярус 4 - Патчи  ---------------------------
     # -----------Графики в 2-х колонках   
     
-    # 1. Создаем сетку из 2 колонок одинаковой ширины (пропорция 1:1)
+    # Ссетка из 2 колонок одинаковой ширины (пропорция 1:1)
     tier4_col1, tier4_col2 = st.columns(2)
     
     with tier4_col1:
@@ -1212,7 +1199,7 @@ with tab1:
             lowerfence=df_box['min_duration'].tolist(),
             upperfence=df_box['max_duration'].tolist(),
             
-            # --- ЛАВАНДОВЫЕ ЦВЕТА ---
+            # ---  ЦВЕТА ---
             line_color='#6A5ACD',                 # Цвет усов, медианы и контура (глубокий лавандовый)
             fillcolor='rgba(230, 230, 250, 0.6)', # Цвет заливки ящика (нежный лавандовый с прозрачностью)
             marker_color='#7B68EE',               # Цвет точек/маркеров, если они появятся
@@ -1221,7 +1208,7 @@ with tab1:
             width=0.25, 
 
             # Настройки отображения
-            orientation='h',  # 'h' для горизонтальных боксплотов, 'v' если хотите вертикальные (тогда поменяйте местами x и y)
+            orientation='h',  # 'h' для горизонтальных боксплотов, 'v' - вертикальные 
             #marker_color='#1f77b4',
             #line_color='#0f3a5f',
             #fillcolor='rgba(31, 119, 180, 0.5)',
@@ -1242,7 +1229,7 @@ with tab1:
             plot_bgcolor="rgba(0,0,0,0)",   # Полностью прозрачный фон самой координатной сетки
         )
         
-        # Отрисовка в Streamlit
+        # Отрисовка 
         st.plotly_chart(fig, use_container_width=True)
     
     with tier4_col2:
@@ -1277,36 +1264,33 @@ with tab1:
                 xaxis_title="Убийства в минуту (Kills Per Minute)",
                 yaxis_title=None,
                 
-                # Увеличили шкалу до 2.8 и добавили отступ справа (r=60), 
-                # чтобы текст 'KPM' гарантированно не обрезался краем карточки
                 xaxis=dict(range=[0, 2.8]), 
                 height=350,
                 margin=dict(l=20, r=60, t=10, b=20),
                 showlegend=False,
                 
                 # --- МАКСИМАЛЬНЫЙ ЗАЗОР ДЛЯ СИММЕТРИИ С БОКС ПЛОТОМ ---
-                # Значение 0.7 делает столбцы тонкими, оставляя 70% пространства под зазоры
                 bargap=0.5, 
                 
-                # Интеграция в темную тему вашей витрины
+                # Интеграция в темную тему 
                 template="plotly_white",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)"
             )
             
             st.plotly_chart(fig_kpm_bar, use_container_width=True)
-   
-#================================================================================================================
+ #================================================================================================================
 # --- ИГРОКИ ---
+#=========================================================================
 with tab2:
       
     # регион выбирается на сайдбаре
-    # Создаем две колонки: под селектор лиги (25%) и пустую зону (75%)
     
-    #select_col, empty_col = st.columns([0.25, 0.75])
+    # --- ЯРУС 1 ------
+    # Вывод карточек KPI и селектор выбора лиги 
+
     kpi_cols = st.columns([1.2, 1.0, 1.0, 1.0, 1.0])
 
-    #with select_col:
     with kpi_cols[0]:
         
         leagues_list = ['Все лиги', 'CHALLENGER', 'GRANDMASTER', 'MASTER']        
@@ -1324,7 +1308,7 @@ with tab2:
         # Берем САМУЮ ПЕРВУЮ строчку из таблицы (как серию полей)
         row = kpi_data.iloc[0]
         
-        # Извлекаем чистые числа, подставляя 0, если в БД вдруг лежит NULL (None)
+        # Извлекаем чистые числа, подставляя 0, если в БД NULL (None)
         val_players = int(row.get('total_players', 0) or 0)
         val_winrate = round(float(row.get('avg_winrate', 50.0) or 50.0), 1)
         val_matches = int(row.get('avg_matches', 0) or 0)
@@ -1348,7 +1332,6 @@ with tab2:
 
     
     # -----Ярус 2------------   
-
     # Создаем сетку
     main_cols_tier2 = st.columns([0.25, 0.5], gap="small")
     
@@ -1358,7 +1341,7 @@ with tab2:
         
         st.markdown("<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: -0.2rem;margin-bottom: 0.4rem;'>Эффективность выживания: соотношение убийств/ассистов к смертям</span>", unsafe_allow_html=True)
 
-        # Загружаем значение KDA (selected_region из сайдбара, selected_league уже есть в нижнем регистре)
+        # Загружаем значение KDA 
         kda_value = load_league_kda(selected_region, selected_league)
         
 
@@ -1376,7 +1359,7 @@ with tab2:
             gauge = {
                 # Шкала прибора от 1.0 до 4.0 KDA
                 'axis': {'range': [1.0, 4.0], 'tickwidth': 1, 'tickcolor': "#6A5ACD"},
-                'bar': {'color': "#6A5ACD"}, # Наша лавандовая стрелка
+                'bar': {'color': "#6A5ACD"}, 
                 'bgcolor': "rgba(0,0,0,0)",
                 'borderwidth': 1,
                 'bordercolor': "#2d2b54",
@@ -1403,8 +1386,8 @@ with tab2:
 
     
         # МИНИ-СПИДОМЕТР: АГРЕССИЯ (K/A) ---
-        st.markdown("<h4>⚔️ Индекс агрессии игроков лиги</h4>", unsafe_allow_html=True)
-        st.markdown("<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: -0.2rem;margin-bottom: 0.4rem;'>Эгоизм против командной игры: отношение убийств к тейкдаунам (K+A)</span>", unsafe_allow_html=True)
+        st.markdown("<h4>⚔️ Средний K/A игрока лиги</h4>", unsafe_allow_html=True)
+        st.markdown("<span style='font-size: 12px; color: #a09eb5; display: block; margin-top: -0.2rem;margin-bottom: 0.4rem;'>Эгоизм против командной игры: индекс агрессии - отношение убийств к тейкдаунам (K+A)</span>", unsafe_allow_html=True)
 
         # Загружаем значение индекса агрессии
         ka_value = load_league_ka(selected_region, selected_league)
@@ -1543,7 +1526,7 @@ with tab2:
     if top_criterion == "Win Rate, %":           
         # По винрейту 
         df_top = find_top_winrate(selected_region, selected_league)
-        # Проверяем, что данные успешно вернулись
+        
         if not df_top.empty:
             min_val = df_top['winrate'].min()
             max_val = df_top['winrate'].max()
@@ -1691,7 +1674,7 @@ with tab2:
             # Если игрок успешно определен 
             if player_data is not None:
                 
-                # Помещаем сюда  карточки или st.container
+                # карточки 
                 with st.container(border=True):
                     # Внедряем CSS, который применится только внутри этого контейнера
                     st.markdown(
@@ -1713,7 +1696,7 @@ with tab2:
                     st.markdown(f"### Статистика для {player_data['player_name']}")
                     
                     # --- ОТРИСОВКА ИНДИКАТОРОВ В ОТДЕЛЬНЫХ РАМОЧКАХ ---
-                    # Создаем сетку из 3 колонок, чтобы индикаторы встали в ряды друг под другом
+                    # сетка из 3 колонок
                     ind_col1, ind_col2, ind_col3 = st.columns(3, gap="small")
                     
                     with ind_col1:
@@ -1789,9 +1772,9 @@ with tab2:
     else:
         # Если поле ввода ввода пустое, просто выводим подсказку
         st.info("Введите никнейм игрока для начала поиска.")
-
-#================================================================================================================
+#=========================================================================
 # --- ЧЕМПИОНЫ ---
+#=========================================================================
 with tab3:
     # ЯРУС 1 - Загружаем данные для индикаторов для вкладки "Чемпионы"
     if selected_region == "Все регионы":
@@ -2184,9 +2167,6 @@ with tab3:
         else:
             st.warning(f"Данные для карты агрессии не найдены для региона {selected_region}")
 
-
-
-
     # --- ЯРУС 4 -----
     col_row4_left, col_row4_right = st.columns(2)
     
@@ -2379,6 +2359,10 @@ with tab3:
             )
 
             # Выводим график в интерфейс
+
+            # Добавляем микро-отступ, чтобы сдвинуть график вниз. 
+            st.html("<div style='margin-top: 50px;'></div>") 
+            
             st.plotly_chart(fig_pos, use_container_width=True)
             
                                   
@@ -2475,8 +2459,9 @@ with tab3:
     
     # Добавляем путое место внизу дашборда            
     st.markdown("<div style='height: 150px;'></div>", unsafe_allow_html=True)            
-#================================================================================================================
+#==========================================================================
 # --- О ДАШБОРДЕ ---
+#=========================================================================
 with tab4:   
     # Вводная карточка
     st.markdown("""
