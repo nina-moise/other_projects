@@ -38,9 +38,9 @@
       
 
 ## 📂 Структура репозитория
-* `specifications.pdf` - техническое задание
-* `dobro.ipynb` — рабочий Jupyter-ноутбук с кодом исследования и графиками Plotly/Seaborn.
-* `df_don_RFM_for_excel.csv` — полная база данных доноров со всеми рассчитанными RFM-баллами и текстовыми названиями сегментов для массовой автоматизации.
-* `df_abc_for_excel.csv` - файл с результатами ABC-анализа, содержащий разметку доноров по классам A, B и C для индивидуальной работы с ключевыми донорами.
+* [`specifications.pdf`]() - техническое задание
+* [`dobro.ipynb`](https://github.com/nina-moise/other_projects/blob/main/dobro/dobro.ipynb) — рабочий Jupyter-ноутбук с кодом исследования и графиками Plotly/Seaborn.
+* [`df_don_RFM_for_excel.csv`](https://github.com/nina-moise/other_projects/blob/main/dobro/df_don_RFM_for_excel.csv) — полная база данных доноров со всеми рассчитанными RFM-баллами и текстовыми названиями сегментов для массовой автоматизации.
+* [`df_abc_for_excel.csv`](https://github.com/nina-moise/other_projects/blob/main/dobro/df_abc_for_excel.csv) - файл с результатами ABC-анализа, содержащий разметку доноров по классам A, B и C для индивидуальной работы с ключевыми донорами.
 
 
