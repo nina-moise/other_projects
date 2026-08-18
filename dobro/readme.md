@@ -14,15 +14,10 @@
 [pdf](https://github.com/nina-moise/other_projects/blob/main/dobro/specifications.pdf)
 
 ## Навыки и инструменты
-+ **Python**
-+ **Pandas**
-+ **Numpy**
-+ **Seaborn**
-+ **Matplotlib**
-+ **Plotly**
-+ **Statsmodels**
-+ **Lifelines**
-+ **Jupyter Notebook**
+* **Язык разработки:** Python
+* **Анализ данных и моделирование:** Pandas, Numpy, statsmodels (Z-тест долей), lifelines (Анализ выживаемости Каплана-Майера, Nelson-Aalen Hazard Rate)
+* **Визуализация:** Matplotlib, Seaborn, Plotly Express
+* **Среда выполнения:** Jupyter Notebook
 
 ### Основные этапы исследования:
 1. **Предобработка данных:** Агрегация транзакций, выявление и очистка базы от технических аномалий и тестовых логов.
